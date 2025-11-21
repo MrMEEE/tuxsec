@@ -33,6 +33,7 @@ urlpatterns = [
     path('<uuid:agent_id>/sync-firewall/', views.agent_sync_firewall, name='agent-sync-firewall'),
     path('<uuid:agent_id>/zones-data/', views.agent_zones_data, name='agent-zones-data'),
     path('<uuid:agent_id>/available-services/', views.agent_available_services, name='agent-available-services'),
+    path('<uuid:agent_id>/module/<str:module_name>/toggle/', views.agent_module_toggle, name='agent-module-toggle'),
     
     # Rule management routes
     path('<uuid:agent_id>/rule/add/', views.rule_add, name='rule-add'),

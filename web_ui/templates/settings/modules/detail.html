@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ module.display_name }} - Modules - Settings - TuxSec{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'settings:home' %}">Settings</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'settings:module_list' %}">Modules</a></li>
+                    <li class="breadcrumb-item active">{{ module.display_name }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="fas fa-puzzle-piece"></i> {{ module.display_name }}</h1>
+            <p class="text-muted">{{ module.description }}</p>
+            <span class="badge bg-secondary">Version {{ module.version }}</span>
+            {% if state.enabled_globally %}
+                <span class="badge bg-success">Enabled Globally</span>
+            {% else %}
+                <span class="badge bg-secondary">Disabled</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <strong>Global Settings</strong>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ form.as_p }}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">
+                    <strong>Per-Agent Configuration</strong>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Available</th>
+                                    <th>Enabled</th>
+                                    <th>Last Check</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for am in agent_modules %}
+                                <tr>
+                                    <td>
+                                        <a href="{% url 'agent-detail' am.agent.id %}">{{ am.agent.hostname }}</a>
+                                    </td>
+                                    <td>
+                                        {% if am.available %}
+                                            <span class="badge bg-success">Yes</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">No</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if am.enabled %}
+                                            <span class="badge bg-success">Enabled</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if am.last_check %}
+                                            {{ am.last_check|timesince }} ago
+                                        {% else %}
+                                            <span class="text-muted">Never</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <form method="post" action="{% url 'settings:module_agent_toggle' module.name am.agent.id %}" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-{% if am.enabled %}warning{% else %}success{% endif %}">
+                                                <i class="fas fa-toggle-{% if am.enabled %}off{% else %}on{% endif %}"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">No agents configured for this module yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <strong>Module Information</strong>
+                </div>
+                <div class="card-body">
+                    <dl>
+                        <dt>Module ID</dt>
+                        <dd><code>{{ module.name }}</code></dd>
+
+                        <dt>Capabilities</dt>
+                        <dd>
+                            {% for cap in module.capabilities %}
+                                <span class="badge bg-info text-dark">{{ cap.value }}</span>
+                            {% endfor %}
+                        </dd>
+
+                        <dt>Required Packages</dt>
+                        <dd>
+                            <ul class="small">
+                                {% for pkg in module.get_required_packages %}
+                                    <li><code>{{ pkg }}</code></li>
+                                {% endfor %}
+                            </ul>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <strong>Available Actions ({{ actions|length }})</strong>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush small" style="max-height: 400px; overflow-y: auto;">
+                        {% for action in actions %}
+                            <div class="list-group-item px-0">
+                                <code>{{ action }}</code>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

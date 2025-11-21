@@ -43,11 +43,33 @@
                             <i class="fas fa-server"></i> Agents
                         </a>
                     </li>
-                    {% if user.userprofile.role == 'admin' %}
+                    
+                    <!-- Dynamic Module Menu Items -->
+                    {% for module in enabled_modules %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'user-list' %}">
-                            <i class="fas fa-users"></i> Users
+                        <a class="nav-link" href="{% url 'settings:module_detail' module.name %}">
+                            <i class="fas {{ module.icon }}"></i> {{ module.display_name }}
                         </a>
+                    </li>
+                    {% endfor %}
+                    
+                    {% if user.is_staff %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-cog"></i> Settings
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'settings:home' %}">
+                                <i class="fas fa-home me-2"></i>Settings Home
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'settings:module_list' %}">
+                                <i class="fas fa-puzzle-piece me-2"></i>Modules
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'settings:user_list' %}">
+                                <i class="fas fa-users me-2"></i>Users
+                            </a></li>
+                        </ul>
                     </li>
                     {% endif %}
                 </ul>
@@ -59,10 +81,6 @@
                                 <i class="fas fa-user"></i> {{ user.username }}
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'admin:index' %}">
-                                    <i class="fas fa-cog me-2"></i>Admin Panel
-                                </a></li>
-                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{% url 'logout' %}">
                                     <i class="fas fa-sign-out-alt me-2"></i>Logout
                                 </a></li>

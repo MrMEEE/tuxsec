@@ -1,6 +1,6 @@
-# firewalld-central Web UI
+# TuxSec Web UI
 
-Django-based web interface for centralized firewalld management.
+Django-based web interface for centralized security management.
 
 ## Features
 
@@ -19,7 +19,7 @@ pip install -r requirements.txt
 
 2. Configure settings:
 ```bash
-cp firewall_central/settings_local.py.example firewall_central/settings_local.py
+cp tuxsec/settings_local.py.example tuxsec/settings_local.py
 # Edit settings_local.py with your configuration
 ```
 

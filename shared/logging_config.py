@@ -13,7 +13,7 @@ from typing import Any, Dict
 def setup_logging(
     log_level: str = "INFO",
     log_file: str = None,
-    component_name: str = "firewalld_central"
+    component_name: str = "tuxsec"
 ) -> None:
     """Setup structured logging for the application."""
     

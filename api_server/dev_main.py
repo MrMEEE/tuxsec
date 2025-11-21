@@ -27,7 +27,7 @@ class CommandResult(BaseModel):
     error: Optional[str] = None
 
 app = FastAPI(
-    title="firewalld-central API",
+    title="TuxSec API",
     description="Centralized firewalld management API server",
     version="1.0.0"
 )
@@ -43,7 +43,7 @@ app.add_middleware(
 
 @app.get("/")
 async def root():
-    return {"message": "firewalld-central API Server", "version": "1.0.0"}
+    return {"message": "TuxSec API Server", "version": "1.0.0"}
 
 @app.get("/api/health")
 async def health_check():
@@ -134,7 +134,7 @@ async def get_agent(agent_id: str):
     return agents_db[agent_id]
 
 if __name__ == "__main__":
-    print("Starting firewalld-central API Server (Development Mode)")
+    print("Starting TuxSec API Server (Development Mode)")
     print("API Documentation: http://0.0.0.0:8000/docs")
     uvicorn.run(
         "dev_main:app",

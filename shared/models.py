@@ -1,5 +1,5 @@
 """
-Shared models and data structures for the firewalld central management system.
+Shared models and data structures for the TuxSec management system.
 """
 
 from datetime import datetime

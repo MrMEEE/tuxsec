@@ -71,10 +71,71 @@ def agent_list(request):
 @login_required
 def agent_detail(request, agent_id):
     """Agent detail view."""
+    from modules.models import Module, AgentModule
+    from shared.modules.registry import registry
+    
     agent = get_object_or_404(Agent, id=agent_id)
     zones = agent.zones.all()
     rules = agent.rules.all()
     recent_commands = agent.commands.order_by('-created_at')[:10]
+    
+    # Get all modules for this agent
+    # Only show modules that are enabled globally
+    modules_data = []
+    
+    for module_name in registry.list_module_names():
+        module = registry.get(module_name)
+        if not module:
+            continue
+        
+        # Get or create Module state
+        module_state, _ = Module.objects.get_or_create(
+            name=module_name,
+            defaults={'enabled_globally': False}
+        )
+        
+        # Only show modules that are enabled globally
+        if not module_state.enabled_globally:
+            continue
+        
+        # Get or create AgentModule
+        agent_module, created = AgentModule.objects.get_or_create(
+            agent=agent,
+            module=module_state,
+            defaults={'enabled': False, 'available': True}  # Default to available since globally enabled
+        )
+        
+        # Ensure available is True for globally enabled modules
+        if not agent_module.available:
+            agent_module.available = True
+            agent_module.save()
+        
+        modules_data.append({
+            'agent_module': agent_module,
+            'name': module_name,
+            'display_name': module.display_name,
+            'description': module.description,
+            'enabled': agent_module.enabled,
+            'available': agent_module.available,
+            'error_message': agent_module.error_message,
+        })
+    
+    # Check if firewalld module is enabled for this specific agent
+    firewalld_enabled = False
+    try:
+        firewalld_state = Module.objects.get(name='firewalld')
+        # Check if enabled globally AND enabled for this agent
+        if firewalld_state.enabled_globally:
+            # Check per-agent setting
+            agent_module = AgentModule.objects.filter(
+                agent=agent,
+                module=firewalld_state,
+                enabled=True
+            ).first()
+            if agent_module:
+                firewalld_enabled = True
+    except Module.DoesNotExist:
+        pass
     
     # Group rules by service/port name
     rules_grouped = {}
@@ -115,6 +176,8 @@ def agent_detail(request, agent_id):
         'rules': rules,
         'rules_grouped': sorted(rules_grouped.values(), key=lambda x: x['name']),
         'recent_commands': recent_commands,
+        'modules': modules_data,
+        'firewalld_enabled': firewalld_enabled,
     }
     
     return render(request, 'dashboard/agent_detail.html', context)

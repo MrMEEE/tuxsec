@@ -4,8 +4,8 @@ from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCom
 
 @admin.register(Agent)
 class AgentAdmin(admin.ModelAdmin):
-    list_display = ['hostname', 'ip_address', 'mode', 'status', 'last_seen', 'created_at']
-    list_filter = ['mode', 'status', 'created_at']
+    list_display = ['hostname', 'ip_address', 'connection_type', 'status', 'last_seen', 'created_at']
+    list_filter = ['connection_type', 'status', 'created_at']
     search_fields = ['hostname', 'ip_address']
     readonly_fields = ['id', 'created_at', 'updated_at']
 

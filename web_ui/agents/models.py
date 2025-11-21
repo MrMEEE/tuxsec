@@ -10,11 +10,6 @@ class Agent(models.Model):
         ('ssh', 'SSH Connection'),
     ]
     
-    AGENT_MODES = [
-        ('push', 'Push Mode'),
-        ('pull', 'Pull Mode'),
-    ]
-    
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
@@ -29,7 +24,6 @@ class Agent(models.Model):
     ip_address = models.GenericIPAddressField()
     port = models.IntegerField(default=8443)
     connection_type = models.CharField(max_length=20, choices=CONNECTION_TYPES, default='agent_to_server')
-    mode = models.CharField(max_length=10, choices=AGENT_MODES, default='push')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     last_seen = models.DateTimeField(null=True, blank=True)
     certificate = models.TextField(blank=True)
@@ -38,7 +32,7 @@ class Agent(models.Model):
     
     # SSH connection fields
     ssh_username = models.CharField(max_length=100, blank=True, help_text="Username for SSH connections")
-    ssh_key_path = models.CharField(max_length=500, blank=True, help_text="Path to SSH private key")
+    ssh_private_key = models.TextField(blank=True, help_text="SSH private key content (PEM format)")
     ssh_password = models.CharField(max_length=255, blank=True, help_text="SSH password (use key-based auth when possible)")
     
     # Agent endpoint fields (for server_to_agent connections)

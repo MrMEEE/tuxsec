@@ -1,0 +1,37 @@
+[Unit]
+Description=TuxSec Root Daemon
+Documentation=https://github.com/MrMEEE/tuxsec
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Security hardening
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=false
+ReadWritePaths=/var/run/tuxsec /var/log/tuxsec
+
+# Ensure directories exist
+ExecStartPre=/bin/mkdir -p /var/run/tuxsec
+ExecStartPre=/bin/mkdir -p /var/log/tuxsec
+ExecStartPre=/bin/chown root:tuxsec /var/run/tuxsec
+ExecStartPre=/bin/chmod 0770 /var/run/tuxsec
+
+# Start daemon
+ExecStart=/usr/bin/python3 -m tuxsec_agent.rootd.daemon
+
+# Restart on failure
+Restart=on-failure
+RestartSec=5s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tuxsec-rootd
+
+[Install]
+WantedBy=multi-user.target

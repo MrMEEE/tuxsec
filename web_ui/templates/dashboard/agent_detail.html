@@ -120,12 +120,20 @@
                             <i class="fas fa-cog me-1"></i>Actions
                         </button>
                         <ul class="dropdown-menu">
+                            {% if agent.status == 'pending' %}
+                            <li><a class="dropdown-item text-success" href="#" onclick="approveAgent()">
+                                <i class="fas fa-check me-2"></i>Approve Agent
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="#" onclick="testConnection()">
                                 <i class="fas fa-satellite-dish me-2"></i>Test Connection
                             </a></li>
+                            {% if firewalld_enabled %}
                             <li><a class="dropdown-item" href="#" onclick="syncFirewallConfig()">
                                 <i class="fas fa-download me-2"></i>Sync Firewall Config
                             </a></li>
+                            {% endif %}
                             <li><a class="dropdown-item" href="#" onclick="refreshAgent()">
                                 <i class="fas fa-sync me-2"></i>Refresh Status
                             </a></li>
@@ -250,9 +258,49 @@
                             {% endif %}
                         </div>
                     </div>
+
+                    <!-- Modules -->
+                    <div class="info-card mt-3">
+                        <div class="card-header">
+                            <h6><i class="fas fa-puzzle-piece me-2"></i>Modules</h6>
+                        </div>
+                        <div class="card-body">
+                            {% if modules %}
+                                {% for module in modules %}
+                                <div class="d-flex justify-content-between align-items-center mb-3 pb-2 {% if not forloop.last %}border-bottom{% endif %}">
+                                    <div class="flex-grow-1">
+                                        <strong>{{ module.display_name }}</strong>
+                                        {% if not module.available %}
+                                            <span class="badge bg-warning text-dark ms-2">Not Available</span>
+                                        {% endif %}
+                                        {% if module.error_message %}
+                                            <br><small class="text-danger">{{ module.error_message }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <div>
+                                        <form method="post" action="{% url 'agent-module-toggle' agent.id module.name %}" style="display: inline;">
+                                            {% csrf_token %}
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" role="switch" 
+                                                       id="module-{{ module.name }}" 
+                                                       {% if module.enabled %}checked{% endif %}
+                                                       {% if not module.available %}disabled{% endif %}
+                                                       onchange="this.form.submit()">
+                                                <label class="form-check-label" for="module-{{ module.name }}"></label>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <p class="text-muted mb-0">No modules configured for this agent.</p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Firewall Zones and Rules -->
+                {% if firewalld_enabled %}
                 <div class="col-lg-8">
                     <!-- Firewall Zones -->
                     <div class="info-card" id="zones-container">
@@ -472,11 +520,11 @@
                     <div class="info-card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5><i class="fas fa-terminal me-2"></i>Recent Commands</h5>
-                            <span class="badge bg-primary">{{ recent_commands.count }} command{{ recent_commands.count|pluralize }}</span>
+                            <span class="badge bg-primary">{{ commands.count }} command{{ commands.count|pluralize }}</span>
                         </div>
                         <div class="card-body" style="max-height: 300px; overflow-y: auto;">
-                            {% if recent_commands %}
-                                {% for command in recent_commands %}
+                            {% if commands %}
+                                {% for command in commands %}
                                 <div class="command-item">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div class="flex-grow-1">
@@ -511,6 +559,66 @@
                         </div>
                     </div>
                 </div>
+                {% else %}
+                <!-- Firewalld Module Disabled -->
+                <div class="col-lg-8">
+                    <div class="alert alert-info">
+                        <h5><i class="fas fa-info-circle me-2"></i>Firewall Module Disabled</h5>
+                        <p class="mb-2">The Firewalld module is not enabled for this agent. To manage firewall configurations:</p>
+                        <ol class="mb-3">
+                            <li>Go to <a href="{% url 'settings:module_detail' 'firewalld' %}" class="alert-link">Settings → Modules → Firewalld</a></li>
+                            <li>Enable the module globally or for this specific agent</li>
+                            <li>Return to this page to manage firewall zones and rules</li>
+                        </ol>
+                        <a href="{% url 'settings:module_detail' 'firewalld' %}" class="btn btn-primary">
+                            <i class="fas fa-cog me-1"></i>Configure Firewalld Module
+                        </a>
+                    </div>
+                    
+                    <!-- Recent Commands (still shown) -->
+                    <div class="info-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5><i class="fas fa-terminal me-2"></i>Recent Commands</h5>
+                            <span class="badge bg-primary">{{ commands.count }} command{{ commands.count|pluralize }}</span>
+                        </div>
+                        <div class="card-body" style="max-height: 300px; overflow-y: auto;">
+                            {% if commands %}
+                                {% for command in commands %}
+                                <div class="command-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div><strong>Command:</strong> {{ command.command }}</div>
+                                            {% if command.parameters %}
+                                            <div><strong>Parameters:</strong> {{ command.parameters }}</div>
+                                            {% endif %}
+                                            <div class="small text-muted">
+                                                Status: 
+                                                <span class="badge bg-{% if command.status == 'completed' %}success{% elif command.status == 'failed' %}danger{% else %}warning{% endif %}">
+                                                    {{ command.get_status_display }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="text-end">
+                                            <small class="text-muted">{{ command.created_at|date:'M d, H:i' }}</small>
+                                        </div>
+                                    </div>
+                                    {% if command.result %}
+                                    <div class="mt-2 p-2 bg-white border rounded">
+                                        <small>{{ command.result|truncatechars:200 }}</small>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="text-muted text-center py-3">
+                                    <i class="fas fa-history me-2"></i>
+                                    No recent commands
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
@@ -958,6 +1066,33 @@ function checkForUpdates() {
         .finally(() => {
             isPolling = false;
         });
+}
+
+function approveAgent() {
+    const agentId = '{{ agent.id }}';
+    
+    if (!confirm('Approve this agent and change status to offline?')) {
+        return;
+    }
+    
+    fetch(`/agents/api/${agentId}/approve/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+    })
+    .then(handleResponse)
+    .then(data => {
+        showSuccess('Agent approved successfully!', false);
+        // Reload page to update status
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000);
+    })
+    .catch(error => {
+        showError('Failed to approve agent: ' + error.message);
+    });
 }
 
 function testConnection() {

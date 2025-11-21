@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Modules - Settings - TuxSec{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-3">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'settings:home' %}">Settings</a></li>
+                    <li class="breadcrumb-item active">Modules</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1><i class="fas fa-puzzle-piece"></i> Security Modules</h1>
+            <p class="text-muted">Enable and configure security modules. Modules are loaded dynamically from the filesystem.</p>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        {% for module in modules %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100 {% if module.enabled_globally %}border-success{% endif %}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <strong>{{ module.display_name }}</strong>
+                    <span class="badge bg-secondary">v{{ module.version }}</span>
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-muted small">{{ module.description }}</p>
+                    
+                    <div class="mb-3">
+                        <strong>Status:</strong>
+                        {% if module.enabled_globally %}
+                            <span class="badge bg-success">Enabled Globally</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Disabled</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Agents:</strong>
+                        <div class="progress" style="height: 20px;">
+                            {% widthratio module.enabled_count module.total_agents 100 as enabled_pct %}
+                            <div class="progress-bar bg-success" style="width: {{ enabled_pct }}%">
+                                {{ module.enabled_count }} enabled
+                            </div>
+                        </div>
+                        <small class="text-muted">{{ module.available_count }} of {{ module.total_agents }} agents have this module available</small>
+                    </div>
+
+                    <div class="mb-2">
+                        <strong>Capabilities:</strong>
+                        <div>
+                            {% for cap in module.capabilities %}
+                                <span class="badge bg-info text-dark">{{ cap }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <details class="mb-3">
+                        <summary class="text-muted small" style="cursor: pointer;">Required Packages</summary>
+                        <ul class="small mt-2">
+                            {% for pkg in module.required_packages %}
+                                <li><code>{{ pkg }}</code></li>
+                            {% endfor %}
+                        </ul>
+                    </details>
+                </div>
+                <div class="card-footer">
+                    <div class="d-flex gap-2 mb-2">
+                        <a href="{% url 'settings:module_detail' module.name %}" class="btn btn-sm btn-primary flex-grow-1">
+                            <i class="fas fa-cog"></i> Configure
+                        </a>
+                        <form method="post" action="{% url 'settings:module_toggle' module.name %}" class="d-inline">
+                            {% csrf_token %}
+                            {% if module.enabled_globally %}
+                                <button type="submit" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-toggle-off"></i> Disable
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-sm btn-success">
+                                    <i class="fas fa-toggle-on"></i> Enable
+                                </button>
+                            {% endif %}
+                        </form>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <form method="post" action="{% url 'settings:module_enable_all' module.name %}" class="flex-grow-1">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-success w-100" title="Enable for all agents">
+                                <i class="fas fa-check-double"></i> Enable All
+                            </button>
+                        </form>
+                        <form method="post" action="{% url 'settings:module_disable_all' module.name %}" class="flex-grow-1">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-warning w-100" title="Disable for all agents">
+                                <i class="fas fa-times-circle"></i> Disable All
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> No modules found. Modules are loaded from <code>web_ui/modules/</code> directory.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

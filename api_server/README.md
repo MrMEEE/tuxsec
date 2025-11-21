@@ -1,4 +1,4 @@
-# firewalld-central API Server
+# TuxSec API Server
 
 FastAPI-based REST API server for centralized firewalld management.
 

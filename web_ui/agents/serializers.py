@@ -3,6 +3,8 @@ from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCom
 
 
 class AgentSerializer(serializers.ModelSerializer):
+    sync_interval_seconds = serializers.IntegerField(default=60, required=False)
+    
     class Meta:
         model = Agent
         fields = '__all__'

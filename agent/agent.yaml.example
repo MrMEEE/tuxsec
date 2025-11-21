@@ -1,0 +1,28 @@
+# TuxSec Agent Configuration
+
+# Connection mode: pull, push, or ssh
+mode: pull
+
+# Server connection settings (for pull mode)
+server_url: https://tuxsec.example.com
+agent_id: null  # Will be set during registration
+api_key: null  # Will be set during registration
+
+# Pull mode settings
+poll_interval: 30  # Seconds between polls
+
+# Push mode settings
+listen_host: 0.0.0.0
+listen_port: 8443
+
+# SSL/TLS settings
+ssl_cert: /etc/tuxsec/certs/agent.crt
+ssl_key: /etc/tuxsec/certs/agent.key
+ca_cert: /etc/tuxsec/certs/ca.crt
+
+# Logging
+log_level: INFO
+log_file: /var/log/tuxsec/agent.log
+
+# Root daemon socket
+rootd_socket: /var/run/tuxsec/rootd.sock

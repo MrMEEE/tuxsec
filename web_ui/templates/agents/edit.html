@@ -1,4 +1,4 @@
-{% extends 'templates/agents/create.html' %}
+{% extends 'agents/create.html' %}
 
 {% block title %}Edit Agent: {{ agent.hostname }} - TuxSec{% endblock %}
 
@@ -74,24 +74,24 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="field-group">
-                                            <label for="{{ form.mode.id_for_label }}" class="form-label">
-                                                <i class="fas fa-cogs me-1"></i>Agent Mode *
-                                            </label>
-                                            {{ form.mode }}
-                                            <div class="form-help">How the agent operates</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Port Configuration -->
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="field-group">
                                             <label for="{{ form.port.id_for_label }}" class="form-label">
                                                 <i class="fas fa-plug me-1"></i>Port *
                                             </label>
                                             {{ form.port }}
                                             <div class="form-help">Connection port (22 for SSH, 8443 for HTTPS)</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Sync Interval -->
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="field-group">
+                                            <label for="{{ form.sync_interval_seconds.id_for_label }}" class="form-label">
+                                                <i class="fas fa-sync me-1"></i>Sync Interval (seconds)
+                                            </label>
+                                            {{ form.sync_interval_seconds }}
+                                            <div class="form-help">{{ form.sync_interval_seconds.help_text }}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -108,17 +108,18 @@
                                         </div>
                                         <div class="col-md-6">
                                             <div class="field-group">
-                                                <label for="{{ form.ssh_key_path.id_for_label }}" class="form-label">SSH Private Key Path</label>
-                                                {{ form.ssh_key_path }}
+                                                <label for="{{ form.ssh_password_input.id_for_label }}" class="form-label">SSH Password</label>
+                                                {{ form.ssh_password_input }}
+                                                <div class="form-help">Leave blank to keep current password</div>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="row">
-                                        <div class="col-md-6">
+                                        <div class="col-md-12">
                                             <div class="field-group">
-                                                <label for="{{ form.ssh_password.id_for_label }}" class="form-label">SSH Password</label>
-                                                {{ form.ssh_password }}
-                                                <div class="form-help">Use key-based authentication when possible</div>
+                                                <label for="{{ form.ssh_private_key.id_for_label }}" class="form-label">SSH Private Key</label>
+                                                {{ form.ssh_private_key }}
+                                                <div class="form-help">Paste your private key content here (leave empty to use password authentication)</div>
                                             </div>
                                         </div>
                                     </div>

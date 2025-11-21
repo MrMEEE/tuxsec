@@ -34,13 +34,13 @@ Create `/etc/systemd/system/firewall-sync.service`:
 
 ```ini
 [Unit]
-Description=Firewall Central Auto-Sync Service
+Description=TuxSec Auto-Sync Service
 After=network.target
 
 [Service]
 Type=simple
 User=www-data
-WorkingDirectory=/path/to/firewall-central/web_ui
+WorkingDirectory=/path/to/tuxsec/web_ui
 ExecStart=/path/to/venv/bin/python manage.py sync_agents --daemon
 Restart=always
 RestartSec=10
@@ -60,7 +60,7 @@ sudo systemctl start firewall-sync
 Add to crontab:
 ```bash
 # Sync agents every minute
-* * * * * cd /path/to/firewall-central/web_ui && /path/to/venv/bin/python manage.py sync_agents
+* * * * * cd /path/to/tuxsec/web_ui && /path/to/venv/bin/python manage.py sync_agents
 ```
 
 ## Firewall Rule Management

@@ -1,244 +1,373 @@
-# Firewalld Central Management - Agents
+# TuxSec Agent
 
-This directory contains the agent implementations for the Firewalld Central Management system. Agents are components that run on target systems to manage firewalld configurations.
+The TuxSec Agent provides secure, modular system management for Linux servers. It uses a two-component architecture that separates privileged operations from network communication.
 
-## Agent Types
+## Architecture Overview
 
-The system supports three types of agent connections:
+The agent consists of two main components:
 
-### 1. Agent-to-Server Connection (`firewalld_agent.py`)
+### 1. Root Daemon (`tuxsec-rootd`)
 
-The agent connects to the management server periodically to check for commands.
+- **Runs as:** root
+- **Purpose:** Executes privileged operations in a controlled manner
+- **Communication:** Unix socket (`/var/run/tuxsec/rootd.sock`)
+- **Security:** No arbitrary command execution - only predefined module operations
 
-**Features:**
-- Automatic registration with the server
-- Periodic check-ins for pending commands
-- Executes firewalld commands locally
-- Reports results back to the server
-- Handles network interruptions gracefully
+The root daemon exposes system management capabilities through a modular plugin system. Each module provides specific functionality (firewall management, SELinux, AIDE, etc.) with well-defined actions.
 
-**Usage:**
-```bash
-# Install dependencies
-pip install -r requirements.txt
+**Built-in modules:**
+- `systeminfo` - System information (always available)
+- `firewalld` - Firewall management (optional)
+- More modules can be added as plugins
 
-# Run the agent
-python firewalld_agent.py --server-url http://192.168.1.100:8001 --hostname myhost --ip 192.168.1.50
-```
+### 2. Userspace Agent (`tuxsec-agent`)
 
-**Configuration:**
-- `--server-url`: URL of the management server
-- `--hostname`: Agent hostname (default: system hostname)
-- `--ip`: Agent IP address (default: auto-detected)
+- **Runs as:** unprivileged user (`tuxsec`)
+- **Purpose:** Bridge between TuxSec server and root daemon
+- **Communication:** HTTPS/SSH with server, Unix socket with root daemon
 
-### 2. Server-to-Agent Connection (`http_agent.py`)
+The userspace agent handles all network communication and delegates privileged operations to the root daemon.
 
-The agent runs an HTTP server that listens for connections from the management server.
+**Connection modes:**
 
-**Features:**
-- HTTP API for command execution
-- Health check endpoint
-- Optional API key authentication
-- Real-time command execution
-- JSON-based communication
+1. **Pull Mode** - Agent initiates connections to server
+   - Polls server for pending jobs
+   - Executes jobs through root daemon
+   - Reports results back to server
 
-**Usage:**
-```bash
-# Run the HTTP agent
-python http_agent.py --port 8444 --api-key my-secret-key
-```
+2. **Push Mode** - Server initiates connections to agent
+   - Agent listens on configured port (default: 8443)
+   - Server pushes jobs to agent
+   - Agent executes through root daemon and returns results
 
-**Configuration:**
-- `--port`: Port to listen on (default: 8444)
-- `--host`: Host to bind to (default: 0.0.0.0)
-- `--api-key`: API key for authentication (optional)
-
-**Endpoints:**
-- `GET /health` - Health check and system information
-- `POST /execute` - Execute firewalld commands
-
-### 3. SSH Connection
-
-Uses standard SSH to connect to remote systems and execute firewalld commands.
-
-**Features:**
-- Uses existing SSH infrastructure
-- Supports key-based and password authentication
-- Direct command execution via SSH
-- No additional software required on target systems
-
-**Configuration:**
-Configure SSH connection details in the web interface:
-- SSH username
-- SSH private key path or password
-- Target IP address and port
-
-## Supported Commands
-
-All agent types support the following firewalld commands:
-
-- `get_status` - Get firewall status
-- `get_zones` - Get all firewall zones and their configurations
-- `get_rules` - Get all firewall rules across zones
-- `add_service` - Add a service to a zone
-- `remove_service` - Remove a service from a zone
-
-## Security Considerations
-
-### Agent-to-Server
-- Agents receive unique API keys during registration
-- All communication uses HTTPS in production
-- Commands are queued and executed asynchronously
-
-### Server-to-Agent (HTTP)
-- Optional API key authentication
-- Bind to specific interfaces for security
-- Use firewall rules to restrict access
-- Enable HTTPS for production deployments
-
-### SSH
-- Use key-based authentication when possible
-- Restrict SSH access using firewall rules
-- Use dedicated service accounts with minimal privileges
-- Consider using SSH certificates for large deployments
+3. **SSH Mode** - Server connects via SSH
+   - Server uses SSH to connect as `tuxsec` user
+   - Commands executed through `tuxsec-cli` tool
+   - CLI communicates with root daemon
 
 ## Installation
 
-### Agent Dependencies
+### Prerequisites
+
+- Linux system with systemd
+- Python 3.8 or higher
+- Root access for installation
+
+### Quick Install
+
 ```bash
-pip install requests>=2.28.0
+cd tuxsec_agent
+sudo bash install.sh
 ```
 
-### System Requirements
-- Python 3.7+
-- firewalld installed and configured
-- systemctl access (for status checks)
-- Network connectivity to management server
+This will:
+- Create `tuxsec` user and group
+- Set up required directories
+- Install systemd services
+- Create default configuration
 
-### Firewall Configuration
-Ensure the following ports are accessible:
+### Manual Installation
 
-**For Agent-to-Server:**
-- Outbound HTTPS (443) or HTTP (8001) to management server
+1. **Create user:**
+   ```bash
+   sudo useradd --system --shell /bin/bash --create-home --home-dir /var/lib/tuxsec tuxsec
+   ```
 
-**For Server-to-Agent:**
-- Inbound TCP on agent port (default 8444)
+2. **Create directories:**
+   ```bash
+   sudo mkdir -p /etc/tuxsec/certs
+   sudo mkdir -p /var/run/tuxsec
+   sudo mkdir -p /var/log/tuxsec
+   sudo mkdir -p /var/lib/tuxsec
+   ```
 
-**For SSH:**
-- Inbound TCP 22 (or custom SSH port)
+3. **Set permissions:**
+   ```bash
+   sudo chown root:tuxsec /var/run/tuxsec
+   sudo chmod 0770 /var/run/tuxsec
+   sudo chown tuxsec:tuxsec /var/log/tuxsec
+   ```
 
-## Production Deployment
+4. **Install Python dependencies:**
+   ```bash
+   pip install pyyaml httpx aiohttp
+   ```
 
-### Systemd Service (Agent-to-Server)
-```ini
-[Unit]
-Description=Firewalld Central Management Agent
-After=network.target firewalld.service
+5. **Copy configuration:**
+   ```bash
+   sudo cp agent.yaml.example /etc/tuxsec/agent.yaml
+   sudo chown root:tuxsec /etc/tuxsec/agent.yaml
+   sudo chmod 0640 /etc/tuxsec/agent.yaml
+   ```
 
-[Service]
-Type=simple
-User=firewalld-agent
-ExecStart=/usr/local/bin/firewalld_agent.py --server-url https://firewall-mgmt.example.com
-Restart=always
-RestartSec=30
+6. **Install systemd services:**
+   ```bash
+   sudo cp systemd/*.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   ```
 
-[Install]
-WantedBy=multi-user.target
+## Configuration
+
+Edit `/etc/tuxsec/agent.yaml`:
+
+```yaml
+# Connection mode: pull, push, or ssh
+mode: pull
+
+# Server connection (for pull mode)
+server_url: https://tuxsec.example.com
+agent_id: null  # Set during registration
+api_key: null   # Set during registration
+
+# Pull mode settings
+poll_interval: 30  # Seconds between polls
+
+# Push mode settings
+listen_host: 0.0.0.0
+listen_port: 8443
+
+# SSL/TLS certificates
+ssl_cert: /etc/tuxsec/certs/agent.crt
+ssl_key: /etc/tuxsec/certs/agent.key
+ca_cert: /etc/tuxsec/certs/ca.crt
+
+# Logging
+log_level: INFO
+log_file: /var/log/tuxsec/agent.log
 ```
 
-### Systemd Service (HTTP Agent)
-```ini
-[Unit]
-Description=Firewalld HTTP Agent
-After=network.target firewalld.service
+## Usage
 
-[Service]
-Type=simple
-User=firewalld-agent
-ExecStart=/usr/local/bin/http_agent.py --port 8444 --api-key "${API_KEY}"
-Restart=always
-RestartSec=10
+### Starting Services
 
-[Install]
-WantedBy=multi-user.target
+```bash
+# Start root daemon
+sudo systemctl start tuxsec-rootd
+
+# Start userspace agent
+sudo systemctl start tuxsec-agent
+
+# Enable on boot
+sudo systemctl enable tuxsec-rootd tuxsec-agent
 ```
 
-### Docker Deployment
-```dockerfile
-FROM python:3.9-slim
+### Checking Status
 
-RUN apt-get update && apt-get install -y \
-    firewalld \
-    systemctl \
-    && rm -rf /var/lib/apt/lists/*
+```bash
+# Check services
+sudo systemctl status tuxsec-rootd
+sudo systemctl status tuxsec-agent
 
-COPY requirements.txt .
-RUN pip install -r requirements.txt
+# View logs
+sudo journalctl -u tuxsec-rootd -f
+sudo journalctl -u tuxsec-agent -f
 
-COPY *.py /app/
-WORKDIR /app
-
-# For agent-to-server
-ENTRYPOINT ["python", "firewalld_agent.py"]
-
-# For server-to-agent
-# EXPOSE 8444
-# ENTRYPOINT ["python", "http_agent.py"]
+# Or check log files
+sudo tail -f /var/log/tuxsec/rootd.log
+sudo tail -f /var/log/tuxsec/agent.log
 ```
+
+### Using the CLI
+
+The `tuxsec-cli` tool provides command-line access to the agent (useful for SSH mode):
+
+```bash
+# Get system information
+sudo -u tuxsec tuxsec-cli system-info
+
+# List available modules
+sudo -u tuxsec tuxsec-cli list-modules
+
+# Get module information
+sudo -u tuxsec tuxsec-cli module-info firewalld
+
+# Execute commands
+sudo -u tuxsec tuxsec-cli execute systeminfo get_hostname
+sudo -u tuxsec tuxsec-cli execute firewalld list_zones
+sudo -u tuxsec tuxsec-cli execute firewalld add_service --param zone=public --param service=http
+```
+
+## Module Development
+
+To create a new module, inherit from `BaseModule`:
+
+```python
+from tuxsec_agent.rootd.base_module import BaseModule
+from tuxsec_agent.rootd.protocol import ModuleCapability, CommandRequest, CommandResponse
+
+class MyModule(BaseModule):
+    @property
+    def name(self) -> str:
+        return "mymodule"
+    
+    @property
+    def version(self) -> str:
+        return "1.0.0"
+    
+    @property
+    def description(self) -> str:
+        return "My custom module"
+    
+    def get_capabilities(self) -> List[ModuleCapability]:
+        return [
+            ModuleCapability(
+                name="my_action",
+                description="Perform an action",
+                parameters=[
+                    {"name": "param1", "type": "string", "description": "Parameter 1", "required": "true"}
+                ]
+            )
+        ]
+    
+    def initialize(self) -> tuple[bool, Optional[str]]:
+        # Initialize module
+        return True, None
+    
+    def shutdown(self):
+        # Cleanup
+        pass
+    
+    def execute_command(self, command: CommandRequest) -> CommandResponse:
+        # Execute command
+        if command.action == "my_action":
+            # Do something
+            return CommandResponse(success=True, data={"result": "OK"})
+        
+        return CommandResponse(success=False, error="Unknown action")
+```
+
+Register the module in `tuxsec_agent/rootd/daemon.py`:
+
+```python
+from .modules.mymodule import MyModule
+
+# In _load_modules method:
+mymodule = MyModule()
+self.registry.register_module(mymodule)
+```
+
+## Security
+
+### Privilege Separation
+
+- Root daemon only executes well-defined module operations
+- No arbitrary command execution
+- Userspace agent runs as unprivileged user
+- Unix socket permissions restrict access
+
+### Network Communication
+
+- TLS/SSL for all network communication (pull/push modes)
+- API key authentication
+- Certificate-based authentication for SSH mode
+
+### File Permissions
+
+- `/var/run/tuxsec/rootd.sock` - 0660 root:tuxsec
+- `/etc/tuxsec/agent.yaml` - 0640 root:tuxsec
+- `/var/log/tuxsec/` - 0755 tuxsec:tuxsec
 
 ## Troubleshooting
 
-### Common Issues
+### Root daemon won't start
 
-**Agent can't connect to server:**
-- Check network connectivity
-- Verify server URL and port
-- Check firewall rules on both ends
-- Verify SSL/TLS configuration
-
-**Commands fail to execute:**
-- Ensure firewalld is running: `systemctl status firewalld`
-- Check user permissions for firewall-cmd
-- Verify firewalld service is enabled
-- Check system logs: `journalctl -u firewalld`
-
-**SSH connection fails:**
-- Verify SSH service is running
-- Check SSH key permissions (600 for private keys)
-- Test manual SSH connection
-- Verify SSH user has sudo/firewall permissions
-
-### Debugging
-
-Enable debug logging by modifying the agents:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
-Check firewalld logs:
+Check if socket directory exists and has correct permissions:
 ```bash
-journalctl -u firewalld -f
+sudo ls -la /var/run/tuxsec/
+sudo mkdir -p /var/run/tuxsec
+sudo chown root:tuxsec /var/run/tuxsec
+sudo chmod 0770 /var/run/tuxsec
 ```
 
-Test firewall commands manually:
+### Userspace agent can't connect to root daemon
+
+Check that root daemon is running:
 ```bash
-firewall-cmd --state
-firewall-cmd --get-zones
-firewall-cmd --list-all
+sudo systemctl status tuxsec-rootd
 ```
 
-## Contributing
+Verify socket permissions:
+```bash
+sudo ls -l /var/run/tuxsec/rootd.sock
+```
 
-When adding new commands or features:
+Test connection:
+```bash
+sudo -u tuxsec tuxsec-cli system-info
+```
 
-1. Implement the command in all agent types
-2. Add appropriate error handling
-3. Update the command documentation
-4. Test with different firewalld configurations
-5. Update the web interface accordingly
+### Module not available
+
+Check if module initialized successfully:
+```bash
+sudo journalctl -u tuxsec-rootd | grep -i module
+```
+
+For firewalld module, ensure firewalld is installed:
+```bash
+sudo dnf install firewalld  # RHEL/Fedora
+sudo apt install firewalld  # Debian/Ubuntu
+```
+
+### Permission denied errors
+
+Ensure tuxsec user is in correct group:
+```bash
+sudo usermod -a -G tuxsec tuxsec
+```
+
+Check file ownership:
+```bash
+sudo ls -la /etc/tuxsec/
+sudo ls -la /var/log/tuxsec/
+sudo ls -la /var/run/tuxsec/
+```
+
+## Architecture Diagrams
+
+### Pull Mode
+```
+[TuxSec Server] <--- HTTPS --- [tuxsec-agent (unprivileged)]
+                                        |
+                                   Unix Socket
+                                        |
+                               [tuxsec-rootd (root)]
+                                        |
+                                   [Firewalld, SELinux, etc.]
+```
+
+### Push Mode
+```
+[TuxSec Server] --- HTTPS ---> [tuxsec-agent (unprivileged)]
+                                        |
+                                   Unix Socket
+                                        |
+                               [tuxsec-rootd (root)]
+                                        |
+                                   [Firewalld, SELinux, etc.]
+```
+
+### SSH Mode
+```
+[TuxSec Server] --- SSH ---> [tuxsec user shell]
+                                     |
+                                [tuxsec-cli]
+                                     |
+                                Unix Socket
+                                     |
+                            [tuxsec-rootd (root)]
+                                     |
+                                [Firewalld, SELinux, etc.]
+```
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+See LICENSE file in the repository root.
+
+## Contributing
+
+Contributions welcome! Please submit pull requests or open issues on GitHub.
+
+## Support
+
+For support, please open an issue on the GitHub repository or contact the maintainers.

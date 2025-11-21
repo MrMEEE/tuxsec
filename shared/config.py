@@ -28,14 +28,14 @@ class BaseConfig(BaseSettings):
     api_secret_key: str = "your-api-secret-key-change-this-in-production"
     
     # Database
-    database_url: str = "postgresql://firewalld_user:firewalld_pass@localhost:5432/firewalld_central"
+    database_url: str = "postgresql://tuxsec_user:tuxsec_pass@localhost:5432/tuxsec_db"
     
     # Redis
     redis_url: str = "redis://localhost:6379/0"
     
     # Logging
     log_level: str = "INFO"
-    log_file: str = "./logs/firewalld_central.log"
+    log_file: str = "./logs/tuxsec.log"
     
     # SSL/TLS
     ssl_cert_path: str = "./certs/server.crt"

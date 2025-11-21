@@ -21,7 +21,7 @@ class CertificateManager:
         self.ca_cert_path = ca_cert_path
         self.ca_key_path = ca_key_path
         
-    def generate_ca_certificate(self, common_name: str = "Firewalld Central CA") -> Tuple[bytes, bytes]:
+    def generate_ca_certificate(self, common_name: str = "TuxSec CA") -> Tuple[bytes, bytes]:
         """Generate a new Certificate Authority certificate and private key."""
         # Generate private key
         private_key = rsa.generate_private_key(
@@ -34,7 +34,7 @@ class CertificateManager:
             x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
             x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "CA"),
             x509.NameAttribute(NameOID.LOCALITY_NAME, "San Francisco"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Firewalld Central"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "TuxSec"),
             x509.NameAttribute(NameOID.COMMON_NAME, common_name),
         ])
         
@@ -105,7 +105,7 @@ class CertificateManager:
             x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
             x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "CA"),
             x509.NameAttribute(NameOID.LOCALITY_NAME, "San Francisco"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Firewalld Central"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "TuxSec"),
             x509.NameAttribute(NameOID.COMMON_NAME, hostname),
         ])
         
@@ -189,7 +189,7 @@ class CertificateManager:
             x509.NameAttribute(NameOID.COUNTRY_NAME, "US"),
             x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "CA"),
             x509.NameAttribute(NameOID.LOCALITY_NAME, "San Francisco"),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Firewalld Central"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "TuxSec"),
             x509.NameAttribute(NameOID.COMMON_NAME, f"agent-{client_id}"),
         ])
         

@@ -1,4 +1,4 @@
-# Firewalld Central Management System
+# TuxSec - Central Security Management System
 
 A comprehensive centralized management system for firewalld across multiple servers with **three different agent communication methods**.
 
@@ -10,51 +10,81 @@ A comprehensive centralized management system for firewalld across multiple serv
 
 This system provides a unified web interface and API for managing firewalld configurations across multiple servers, supporting three distinct communication patterns to accommodate different network architectures and security requirements.
 
+## ⚠️ Agent Architecture v2.0
+
+**New Secure Agent Architecture!** The TuxSec agent has been completely redesigned with a two-component architecture:
+
+- **Root Daemon** (`tuxsec-rootd`): Privileged component that executes system operations through a modular plugin system
+- **Userspace Agent** (`tuxsec-agent`): Unprivileged component that handles network communication
+
+**Key Benefits:**
+- ✅ Privilege separation - network code runs unprivileged
+- ✅ Modular plugins - only load what you need
+- ✅ No arbitrary commands - well-defined API only
+- ✅ Multiple modes - pull, push, and SSH
+
+**See [tuxsec_agent/README.md](tuxsec_agent/README.md) for the new architecture documentation.**
+
 ## 🔧 Three Communication Methods
 
-### 1. **Agent-to-Server Connection** 
-- **How it works**: Agents periodically connect to the management server to check for commands
+### 1. **Pull Mode (Agent-to-Server)**
+- **How it works**: Agent polls server for jobs and executes them
 - **Best for**: Agents behind firewalls/NAT, no incoming connections needed
-- **Implementation**: Python agent with registration and periodic check-in
+- **Security**: Agent runs as unprivileged user, delegates to root daemon via Unix socket
 
-### 2. **Server-to-Agent Connection**
-- **How it works**: Management server connects directly to agents via HTTP
+### 2. **Push Mode (Server-to-Agent)**
+- **How it works**: Server pushes jobs directly to agent's HTTPS endpoint
 - **Best for**: Direct network access, real-time command execution
-- **Implementation**: HTTP server running on target systems
+- **Security**: TLS/SSL encrypted, API key authentication
 
-### 3. **SSH Connection**
-- **How it works**: Standard SSH connections to execute firewalld commands
-- **Best for**: Existing SSH infrastructure, minimal setup required
-- **Implementation**: SSH key or password authentication
+### 3. **SSH Mode**
+- **How it works**: Server connects via SSH and executes CLI commands
+- **Best for**: Existing SSH infrastructure, minimal setup
+- **Security**: SSH key authentication, commands through tuxsec-cli tool
 
 ## 🏗️ System Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   Django Web UI │    │   FastAPI Server │    │   Agent Types   │
+│   Django Web UI │    │   FastAPI Server │    │   Agent (v2.0)  │
 │                 │    │                  │    │                 │
-│ • Agent Mgmt    │◄──►│ • REST API       │◄──►│ • SSH Agent     │
-│ • Firewall Rules│    │ • WebSocket      │    │ • HTTP Agent    │
-│ • Real-time UI  │    │ • Authentication │    │ • Client Agent  │
-│ • User Auth     │    │ • Command Queue  │    │                 │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
+│ • Agent Mgmt    │◄──►│ • REST API       │◄──►│ tuxsec-agent    │
+│ • Firewall Rules│    │ • WebSocket      │    │ (unprivileged)  │
+│ • Real-time UI  │    │ • Authentication │    │        │        │
+│ • User Auth     │    │ • Command Queue  │    │  Unix Socket    │
+│ • Module Mgmt   │    │ • Job Dispatch   │    │        ▼        │
+└─────────────────┘    └──────────────────┘    │ tuxsec-rootd    │
+                                                │    (root)       │
+                                                │   ┌──────────┐  │
+                                                │   │ Modules: │  │
+                                                │   │ firewalld│  │
+                                                │   │ selinux  │  │
+                                                │   │ aide     │  │
+                                                │   └──────────┘  │
+                                                └─────────────────┘
 ```
 
 ## 📦 Components
 
 - **[Web UI](web_ui/)**: Django-based management interface with dynamic forms
 - **[API Server](api_server/)**: FastAPI REST API for programmatic access
-- **[Agents](agent/)**: Multiple agent implementations for different use cases
+- **[Agent v2.0](tuxsec_agent/)**: **NEW** Two-component secure agent with module system
+- **[Legacy Agents](agent/)**: Original agent implementations (deprecated)
 - **[Shared](shared/)**: Common models, utilities, and configuration
+- **[Module System](MODULE_SYSTEM.md)**: Plugin-based architecture for security modules
 
 ## Features
 
+- **Modular Architecture**: Plugin-based system for security features (Firewalld, SELinux, ClamAV, AIDE)
+- **Per-Agent Module Control**: Enable/disable specific modules on individual agents
 - **Visual Network Management**: Drag-and-drop interface for defining network connections
 - **Comprehensive Firewall Control**: Support for all firewalld features including rich rules and masquerade
+- **SELinux Management**: Control SELinux modes, booleans, and contexts
 - **Secure Communication**: Self-signed certificate-based authentication between components
 - **Role-Based Access**: Granular user permissions for different server groups
 - **Real-time Updates**: Live status monitoring and configuration synchronization
 - **Dual Operation Modes**: Support for both agent-initiated (pull) and server-initiated (push) communication
+- **Module Action Logging**: Complete audit trail of all module actions
 
 ## Quick Start
 
@@ -69,7 +99,7 @@ This system provides a unified web interface and API for managing firewalld conf
 1. Clone and setup the project:
 ```bash
 git clone <repository-url>
-cd firewalld-central
+cd tuxsec
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -103,7 +133,7 @@ python manage.py runserver
 
 # Terminal 4: Start Celery (for background tasks)
 cd web_ui
-celery -A firewalld_central worker --loglevel=info
+celery -A tuxsec worker --loglevel=info
 ```
 
 ### Agent Installation
@@ -112,7 +142,7 @@ On each server to be managed:
 
 1. Copy the agent files:
 ```bash
-scp -r firewalld_agent/ root@target-server:/opt/firewalld-agent/
+scp -r tuxsec_agent/ root@target-server:/opt/tuxsec-agent/
 ```
 
 2. Install dependencies:
@@ -140,7 +170,7 @@ Create a `.env` file in the project root:
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:password@localhost:5432/firewalld_central
+DATABASE_URL=postgresql://user:password@localhost:5432/tuxsec_db
 
 # Redis
 REDIS_URL=redis://localhost:6379/0

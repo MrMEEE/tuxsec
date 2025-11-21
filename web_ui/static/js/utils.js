@@ -381,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Export functions for use in other scripts
-window.firewalldCentral = {
+window.tuxsec = {
     makeRequest,
     showNotification,
     refreshAgent,

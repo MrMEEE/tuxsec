@@ -15,7 +15,7 @@ import asyncio
 from datetime import datetime
 
 from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCommand
-from .forms import AgentForm, AgentQuickAddForm
+from .forms import AgentForm
 from .serializers import (
     AgentSerializer, FirewallZoneSerializer, FirewallRuleSerializer,
     AgentConnectionSerializer, AgentCommandSerializer
@@ -132,14 +132,24 @@ def agent_status(request, agent_id):
     agent = get_object_or_404(Agent, id=agent_id)
     
     try:
-        # Send status request to agent
-        if agent.mode == 'push':
+        # Send status request to agent based on connection type
+        if agent.connection_type in ['server_to_agent', 'ssh']:
             # Direct communication with agent
             async def get_status():
                 async with httpx.AsyncClient() as client:
-                    url = f"https://{agent.ip_address}:{agent.port}/api/status"
-                    response = await client.get(url, timeout=10, verify=False)
-                    return response.json()
+                    if agent.connection_type == 'ssh':
+                        # For SSH, we need to use connection manager
+                        # For now, return basic info
+                        return {
+                            'status': 'connected',
+                            'connection_type': 'ssh',
+                            'message': 'SSH status check not yet implemented'
+                        }
+                    else:
+                        # Direct HTTPS connection to agent
+                        url = f"https://{agent.ip_address}:{agent.agent_port}/api/status"
+                        response = await client.get(url, timeout=10, verify=False)
+                        return response.json()
             
             # Run async function
             loop = asyncio.new_event_loop()
@@ -176,17 +186,15 @@ def approve_agent(request, agent_id):
     """Approve a pending agent."""
     agent = get_object_or_404(Agent, id=agent_id)
     
-    if agent.status != 'pending':
-        return JsonResponse({
-            'error': 'Agent is not in pending status'
-        }, status=400)
+    if agent.status == 'pending':
+        agent.status = 'offline'  # Change to offline, ready for connection
     
-    agent.status = 'approved'
     agent.save()
     
     return JsonResponse({
         'message': 'Agent approved successfully',
-        'agent_id': str(agent.id)
+        'agent_id': str(agent.id),
+        'status': agent.status
     })
 
 
@@ -222,8 +230,71 @@ def agent_list(request):
 def agent_detail(request, agent_id):
     """Detail view for a specific agent."""
     agent = get_object_or_404(Agent, id=agent_id)
-    zones = agent.zones.all()
-    rules = agent.rules.all()
+    
+    # Check if firewalld module is enabled for this agent
+    from modules.models import Module, AgentModule
+    from shared.modules.registry import registry
+    
+    firewalld_enabled = False
+    try:
+        firewalld_state = Module.objects.get(name='firewalld')
+        # Check if enabled globally AND enabled for this agent
+        if firewalld_state.enabled_globally:
+            # Check per-agent setting
+            agent_module = AgentModule.objects.filter(
+                agent=agent,
+                module=firewalld_state,
+                enabled=True
+            ).first()
+            if agent_module:
+                firewalld_enabled = True
+    except Module.DoesNotExist:
+        pass
+    
+    # Get all modules for this agent
+    # Only show modules that are enabled globally
+    modules_data = []
+    
+    for module_name in registry.list_module_names():
+        module = registry.get(module_name)
+        if not module:
+            continue
+        
+        # Get or create Module state
+        module_state, _ = Module.objects.get_or_create(
+            name=module_name,
+            defaults={'enabled_globally': False}
+        )
+        
+        # Only show modules that are enabled globally
+        if not module_state.enabled_globally:
+            continue
+        
+        # Get or create AgentModule
+        agent_module, created = AgentModule.objects.get_or_create(
+            agent=agent,
+            module=module_state,
+            defaults={'enabled': False, 'available': True}  # Default to available since globally enabled
+        )
+        
+        # Ensure available is True for globally enabled modules
+        if not agent_module.available:
+            agent_module.available = True
+            agent_module.save()
+        
+        modules_data.append({
+            'agent_module': agent_module,
+            'name': module_name,
+            'display_name': module.display_name,
+            'description': module.description,
+            'enabled': agent_module.enabled,
+            'available': agent_module.available,
+            'error_message': agent_module.error_message,
+        })
+    
+    # Only load firewall data if firewalld module is enabled
+    zones = agent.zones.all() if firewalld_enabled else []
+    rules = agent.rules.all() if firewalld_enabled else []
     commands = agent.commands.all()[:10]  # Last 10 commands
     
     return render(request, 'agents/detail.html', {
@@ -231,7 +302,37 @@ def agent_detail(request, agent_id):
         'zones': zones,
         'rules': rules,
         'commands': commands,
+        'firewalld_enabled': firewalld_enabled,
+        'modules': modules_data,
     })
+
+
+@login_required
+@require_http_methods(['POST'])
+def agent_module_toggle(request, agent_id, module_name):
+    """Toggle module enabled/disabled for a specific agent."""
+    from modules.models import Module, AgentModule
+    from shared.modules.registry import registry
+    
+    agent = get_object_or_404(Agent, id=agent_id)
+    module_state = get_object_or_404(Module, name=module_name)
+    
+    # Get or create agent module
+    agent_module, created = AgentModule.objects.get_or_create(
+        agent=agent,
+        module=module_state,
+        defaults={'enabled': False, 'available': False}
+    )
+    
+    # Toggle enabled status
+    agent_module.enabled = not agent_module.enabled
+    agent_module.save()
+    
+    module = registry.get(module_name)
+    status = "enabled" if agent_module.enabled else "disabled"
+    messages.success(request, f'Module "{module.display_name if module else module_name}" {status} for {agent.hostname}')
+    
+    return redirect('agent-detail', agent_id=agent_id)
 
 
 @login_required
@@ -240,7 +341,11 @@ def agent_create(request):
     if request.method == 'POST':
         form = AgentForm(request.POST)
         if form.is_valid():
-            agent = form.save()
+            agent = form.save(commit=False)
+            # Manually created agents should be approved by default
+            # The "pending" status is for agents that register themselves
+            agent.status = 'offline'  # Default to offline, will become online when connection succeeds
+            agent.save()
             messages.success(request, f'Agent {agent.hostname} created successfully!')
             return redirect('agent-detail', agent_id=agent.id)
     else:
@@ -271,37 +376,9 @@ def agent_edit(request, agent_id):
 
 @login_required
 def agent_quick_add(request):
-    """Quick add form for agents with auto-detection."""
-    if request.method == 'POST':
-        form = AgentQuickAddForm(request.POST)
-        if form.is_valid():
-            data = form.cleaned_data
-            
-            # Create agent with basic info
-            agent = Agent.objects.create(
-                hostname=data['hostname'],
-                ip_address=data['ip_address'],
-                connection_type=data['connection_type'] if data['connection_type'] != 'auto' else 'ssh',
-                ssh_username=data.get('ssh_username', 'root'),
-                description=data.get('description', ''),
-            )
-            
-            # Set appropriate ports based on connection type
-            if agent.connection_type == 'ssh':
-                agent.port = 22
-            elif agent.connection_type == 'server_to_agent':
-                agent.port = 8444
-            else:  # agent_to_server
-                agent.port = 8443
-            
-            agent.save()
-            
-            messages.success(request, f'Agent {agent.hostname} added successfully!')
-            return redirect('agent-detail', agent_id=agent.id)
-    else:
-        form = AgentQuickAddForm()
-    
-    return render(request, 'agents/quick_add.html', {'form': form})
+    """Add a new agent (redirects to standard create form)."""
+    # Simply redirect to the standard create form - we only have one form now
+    return redirect('agent-create')
 
 
 @login_required

@@ -48,7 +48,7 @@ from command_dispatcher import CommandDispatcher
 
 # FastAPI app setup
 app = FastAPI(
-    title="Firewalld Central API",
+    title="TuxSec API",
     description="Central management API for firewalld agents",
     version="1.0.0",
     docs_url="/docs",

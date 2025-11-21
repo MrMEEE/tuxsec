@@ -1,0 +1,39 @@
+[Unit]
+Description=TuxSec Agent (Userspace)
+Documentation=https://github.com/MrMEEE/tuxsec
+After=network.target tuxsec-rootd.service
+Requires=tuxsec-rootd.service
+
+[Service]
+Type=simple
+User=tuxsec
+Group=tuxsec
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+
+# Security hardening
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=true
+ReadWritePaths=/var/log/tuxsec
+
+# Ensure directories exist
+ExecStartPre=/bin/mkdir -p /var/log/tuxsec
+ExecStartPre=/bin/chown tuxsec:tuxsec /var/log/tuxsec
+
+# Start agent
+ExecStart=/usr/bin/python3 -m tuxsec_agent.userspace.agent --config /etc/tuxsec/agent.yaml
+
+# Restart on failure
+Restart=on-failure
+RestartSec=5s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=tuxsec-agent
+
+[Install]
+WantedBy=multi-user.target
