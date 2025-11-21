@@ -178,8 +178,6 @@ else
     exec /usr/bin/python3 -m agent.userspace.setup "$@"
 fi
 EOF
-sys.exit(main())
-EOF
 
 chmod 0755 %{buildroot}%{_bindir}/tuxsec-*
 
