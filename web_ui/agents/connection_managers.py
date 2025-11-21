@@ -82,6 +82,22 @@ class SSHConnectionManager(BaseConnectionManager):
         
         return stdout_text, stderr_text, exit_code
     
+    def _has_tuxsec_cli(self) -> bool:
+        """Check if the new tuxsec-cli is available on the agent."""
+        try:
+            stdout, stderr, exit_code = self._execute_ssh_command('which tuxsec-cli 2>/dev/null')
+            return exit_code == 0 and 'tuxsec-cli' in stdout
+        except Exception:
+            return False
+    
+    def _check_tuxsec_rootd(self) -> bool:
+        """Check if tuxsec-rootd service is running."""
+        try:
+            stdout, stderr, exit_code = self._execute_ssh_command('systemctl is-active tuxsec-rootd 2>/dev/null')
+            return exit_code == 0 and stdout.strip() == 'active'
+        except Exception:
+            return False
+    
     def _detect_os_info(self) -> Optional[str]:
         """Detect operating system from /etc files."""
         try:
@@ -119,7 +135,7 @@ class SSHConnectionManager(BaseConnectionManager):
             return None
     
     async def test_connection(self) -> Dict[str, Any]:
-        """Test SSH connection to agent."""
+        """Test SSH connection to new agent (v0.1.0+)."""
         try:
             # Test basic connectivity
             stdout, stderr, exit_code = self._execute_ssh_command('echo "test"')
@@ -130,34 +146,54 @@ class SSHConnectionManager(BaseConnectionManager):
                     'error': f'SSH test command failed: {stderr}'
                 }
             
-            # Test firewalld availability
-            stdout, stderr, exit_code = self._execute_ssh_command('systemctl is-active firewalld')
-            firewalld_active = stdout.strip() == 'active'
+            # Check if tuxsec-cli is available
+            has_cli = self._has_tuxsec_cli()
+            if not has_cli:
+                return {
+                    'success': False,
+                    'error': 'tuxsec-cli not found. Please install TuxSec agent v0.1.0+'
+                }
             
-            # Test firewall-cmd availability
-            stdout, stderr, exit_code = self._execute_ssh_command('which firewall-cmd')
-            firewall_cmd_available = exit_code == 0
+            # Check if tuxsec-rootd is running
+            rootd_running = self._check_tuxsec_rootd()
+            if not rootd_running:
+                return {
+                    'success': False,
+                    'error': 'tuxsec-rootd service is not running. Start it with: systemctl start tuxsec-rootd'
+                }
             
-            # Detect OS information
-            os_info = self._detect_os_info()
-            if os_info:
-                # Update agent's operating_system field
-                from django.db import connection
-                from django.db.utils import OperationalError
+            # Get system info
+            stdout, stderr, exit_code = self._execute_ssh_command('sudo -u tuxsec tuxsec-cli system-info')
+            if exit_code == 0 and stdout.strip():
                 try:
-                    self.agent.operating_system = os_info
-                    self.agent.save(update_fields=['operating_system'])
-                except (OperationalError, Exception):
-                    # If save fails, continue without updating
+                    system_info = json.loads(stdout)
+                    if system_info.get('success'):
+                        info = system_info.get('result', {})
+                        
+                        # Update agent metadata
+                        if info.get('os'):
+                            self.agent.operating_system = info['os']
+                        if info.get('version'):
+                            self.agent.version = info['version']
+                        self.agent.save(update_fields=['operating_system', 'version'])
+                        
+                        return {
+                            'success': True,
+                            'connection_type': 'SSH (tuxsec-cli)',
+                            'agent_version': info.get('version', '0.1.0'),
+                            'hostname': info.get('hostname'),
+                            'operating_system': info.get('os'),
+                            'uptime': info.get('uptime'),
+                            'modules': info.get('modules', ['systeminfo']),
+                            'message': 'TuxSec agent connection successful'
+                        }
+                except json.JSONDecodeError:
                     pass
             
             return {
                 'success': True,
-                'connection_type': 'SSH',
-                'firewalld_active': firewalld_active,
-                'firewall_cmd_available': firewall_cmd_available,
-                'operating_system': os_info,
-                'message': f'SSH connection successful. Firewalld active: {firewalld_active}'
+                'connection_type': 'SSH (tuxsec-cli)',
+                'message': 'SSH connection successful'
             }
         except Exception as e:
             return {
@@ -165,300 +201,78 @@ class SSHConnectionManager(BaseConnectionManager):
                 'error': f'SSH connection failed: {str(e)}'
             }
     
-    async def execute_command(self, command: str, parameters: Optional[Dict] = None) -> Dict[str, Any]:
-        """Execute firewalld command via SSH."""
+    async def execute_command(self, command: str, parameters: Optional[Dict] = None, module: str = 'firewalld') -> Dict[str, Any]:
+        """Execute command via tuxsec-cli (new agent v0.1.0+)."""
         try:
-            # Build firewall-cmd command
-            cmd_parts = ['firewall-cmd']
-            
             # Normalize command names (handle both hyphen and underscore)
             command = command.replace('-', '_')
             
-            if command == 'get_zones':
-                cmd_parts.append('--get-zones')
-            elif command == 'get_default_zone':
-                cmd_parts.append('--get-default-zone')
-            elif command == 'list_all':
-                cmd_parts.append('--list-all')
-            elif command == 'add_service':
-                service = parameters.get('service') if parameters else None
-                zone = parameters.get('zone') if parameters else None
-                permanent = parameters.get('permanent', True) if parameters else True
-                if permanent:
-                    cmd_parts.append('--permanent')
-                if zone:
-                    cmd_parts.extend(['--zone', zone])
-                if service:
-                    cmd_parts.extend(['--add-service', service])
-            elif command == 'remove_service':
-                service = parameters.get('service') if parameters else None
-                zone = parameters.get('zone') if parameters else None
-                permanent = parameters.get('permanent', True) if parameters else True
-                if permanent:
-                    cmd_parts.append('--permanent')
-                if zone:
-                    cmd_parts.extend(['--zone', zone])
-                if service:
-                    cmd_parts.extend(['--remove-service', service])
-            elif command == 'add_port':
-                port = parameters.get('port') if parameters else None
-                zone = parameters.get('zone') if parameters else None
-                permanent = parameters.get('permanent', True) if parameters else True
-                if permanent:
-                    cmd_parts.append('--permanent')
-                if zone:
-                    cmd_parts.extend(['--zone', zone])
-                if port:
-                    cmd_parts.extend(['--add-port', port])
-            elif command == 'remove_port':
-                port = parameters.get('port') if parameters else None
-                zone = parameters.get('zone') if parameters else None
-                permanent = parameters.get('permanent', True) if parameters else True
-                if permanent:
-                    cmd_parts.append('--permanent')
-                if zone:
-                    cmd_parts.extend(['--zone', zone])
-                if port:
-                    cmd_parts.extend(['--remove-port', port])
-            elif command == 'new_zone':
-                zone = parameters.get('zone') if parameters else None
-                permanent = parameters.get('permanent', True) if parameters else True
-                if permanent:
-                    cmd_parts.append('--permanent')
-                if zone:
-                    cmd_parts.extend(['--new-zone', zone])
-            elif command == 'delete_zone':
-                zone = parameters.get('zone') if parameters else None
-                permanent = parameters.get('permanent', True) if parameters else True
-                if permanent:
-                    cmd_parts.append('--permanent')
-                if zone:
-                    cmd_parts.extend(['--delete-zone', zone])
-            elif command == 'reload':
-                cmd_parts.append('--reload')
-            # Add more commands as needed
+            # Build tuxsec-cli command
+            cmd_parts = ['sudo', '-u', 'tuxsec', 'tuxsec-cli', 'execute', module, command]
             
-            firewall_cmd = ' '.join(cmd_parts)
-            stdout, stderr, exit_code = self._execute_ssh_command(firewall_cmd)
+            # Add parameters
+            if parameters:
+                for key, value in parameters.items():
+                    # Convert boolean to lowercase string
+                    if isinstance(value, bool):
+                        value = str(value).lower()
+                    cmd_parts.extend(['--param', f'{key}={value}'])
             
-            # If this was a permanent change, reload firewalld to apply changes
-            needs_reload = command in ['add_service', 'remove_service', 'add_port', 'remove_port', 'new_zone', 'delete_zone']
-            permanent = parameters.get('permanent', True) if parameters else True
+            cli_cmd = ' '.join(cmd_parts)
+            stdout, stderr, exit_code = self._execute_ssh_command(cli_cmd)
             
-            if exit_code == 0 and needs_reload and permanent:
-                reload_stdout, reload_stderr, reload_exit = self._execute_ssh_command('firewall-cmd --reload')
-                if reload_exit != 0:
-                    stdout += f"\nReload warning: {reload_stderr}"
-            
-            # Log the command
-            AgentCommand.objects.create(
-                agent=self.agent,
-                command=command,
-                parameters=json.dumps(parameters) if parameters else '',
-                result=stdout if exit_code == 0 else stderr,
-                status='completed' if exit_code == 0 else 'failed'
-            )
-            
-            return {
-                'success': exit_code == 0,
-                'output': stdout if exit_code == 0 else stderr,
-                'command': firewall_cmd
-            }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
-    
-    async def get_firewall_status(self) -> Dict[str, Any]:
-        """Get firewall status via SSH."""
-        try:
-            stdout, stderr, exit_code = self._execute_ssh_command('firewall-cmd --state')
-            
-            if exit_code == 0:
-                state = stdout.strip()
-                return {
-                    'success': True,
-                    'state': state,
-                    'active': state == 'running'
-                }
+            # Parse JSON response from tuxsec-cli
+            if exit_code == 0 and stdout.strip():
+                try:
+                    result = json.loads(stdout)
+                    success = result.get('success', False)
+                    output = result.get('result', {})
+                    error = result.get('error')
+                    
+                    # Log the command
+                    AgentCommand.objects.create(
+                        agent=self.agent,
+                        command=f"{module}.{command}",
+                        parameters=json.dumps(parameters) if parameters else '',
+                        result=json.dumps(output),
+                        status='completed' if success else 'failed'
+                    )
+                    
+                    return {
+                        'success': success,
+                        'result': output,
+                        'error': error,
+                        'output': output  # For backward compatibility
+                    }
+                except json.JSONDecodeError:
+                    # If not JSON, treat as plain text output
+                    AgentCommand.objects.create(
+                        agent=self.agent,
+                        command=f"{module}.{command}",
+                        parameters=json.dumps(parameters) if parameters else '',
+                        result=stdout,
+                        status='completed'
+                    )
+                    return {
+                        'success': True,
+                        'output': stdout,
+                        'result': {'output': stdout}
+                    }
             else:
-                return {
-                    'success': False,
-                    'error': stderr
-                }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': str(e)
-            }
-    
-    async def get_zones(self) -> List[Dict[str, Any]]:
-        """Get firewall zones via SSH."""
-        try:
-            # Detect and update OS info if not already set
-            if not self.agent.operating_system or self.agent.operating_system == 'Unknown':
-                os_info = self._detect_os_info()
-                if os_info:
-                    try:
-                        from django.db import connection
-                        from django.db.utils import OperationalError
-                        self.agent.operating_system = os_info
-                        self.agent.save(update_fields=['operating_system'])
-                    except (OperationalError, Exception):
-                        pass
-            
-            stdout, stderr, exit_code = self._execute_ssh_command('firewall-cmd --get-zones')
-            
-            if exit_code == 0:
-                zones = stdout.strip().split()
-                zone_list = []
-                
-                for zone in zones:
-                    # Get detailed info for each zone
-                    stdout, stderr, exit_code = self._execute_ssh_command(f'firewall-cmd --zone={zone} --list-all')
-                    zone_list.append({
-                        'name': zone,
-                        'details': stdout if exit_code == 0 else 'Error getting details'
-                    })
-                
-                return zone_list
-            else:
-                return []
-        except Exception as e:
-            return []
-    
-    async def get_rules(self) -> List[Dict[str, Any]]:
-        """Get firewall rules via SSH."""
-        try:
-            rules = []
-            zones = await self.get_zones()
-            
-            for zone_data in zones:
-                zone = zone_data['name']
-                # Parse the zone details to extract rules
-                details = zone_data.get('details', '')
-                
-                # This is a simplified parser - in reality you'd want more robust parsing
-                for line in details.split('\n'):
-                    line = line.strip()
-                    if line.startswith('services:'):
-                        services = line.replace('services:', '').strip().split()
-                        for service in services:
-                            if service:
-                                rules.append({
-                                    'type': 'service',
-                                    'zone': zone,
-                                    'service': service
-                                })
-                    elif line.startswith('ports:'):
-                        ports = line.replace('ports:', '').strip().split()
-                        for port in ports:
-                            if port:
-                                rules.append({
-                                    'type': 'port',
-                                    'zone': zone,
-                                    'port': port
-                                })
-            
-            return rules
-        except Exception as e:
-            return []
-    
-    async def get_available_services(self) -> List[str]:
-        """Get list of available firewalld services via SSH."""
-        try:
-            stdout, stderr, exit_code = self._execute_ssh_command('firewall-cmd --get-services')
-            
-            if exit_code == 0:
-                # Services are returned as space-separated list
-                services = stdout.strip().split()
-                return sorted(services)  # Return sorted list
-            else:
-                return []
-        except Exception as e:
-            return []
-    
-    def close(self):
-        """Close SSH connection."""
-        if self.ssh_client:
-            self.ssh_client.close()
-            self.ssh_client = None
-
-
-class HTTPAgentConnectionManager(BaseConnectionManager):
-    """HTTP-based connection manager for agents that listen for connections."""
-    
-    def __init__(self, agent: Agent):
-        super().__init__(agent)
-        self.base_url = f"http://{agent.ip_address}:{agent.agent_port}"
-        self.headers = {}
-        
-        if agent.agent_api_key:
-            self.headers['Authorization'] = f'Bearer {agent.agent_api_key}'
-    
-    async def test_connection(self) -> Dict[str, Any]:
-        """Test HTTP connection to agent."""
-        try:
-            response = requests.get(
-                f"{self.base_url}/health", 
-                headers=self.headers, 
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    'success': True,
-                    'connection_type': 'HTTP Agent',
-                    'agent_version': data.get('version', 'Unknown'),
-                    'firewalld_available': data.get('firewalld_available', False),
-                    'message': 'Agent connection successful'
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': f'Agent returned status code: {response.status_code}'
-                }
-        except Exception as e:
-            return {
-                'success': False,
-                'error': f'Agent connection failed: {str(e)}'
-            }
-    
-    async def execute_command(self, command: str, parameters: Optional[Dict] = None) -> Dict[str, Any]:
-        """Execute command via HTTP agent."""
-        try:
-            payload = {
-                'command': command,
-                'parameters': parameters or {}
-            }
-            
-            response = requests.post(
-                f"{self.base_url}/execute",
-                json=payload,
-                headers=self.headers,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                
-                # Log the command
+                # Command failed
                 AgentCommand.objects.create(
                     agent=self.agent,
-                    command=command,
+                    command=f"{module}.{command}",
                     parameters=json.dumps(parameters) if parameters else '',
-                    result=json.dumps(data.get('output', '')),
-                    status='completed' if data.get('success') else 'failed'
+                    result=stderr,
+                    status='failed'
                 )
-                
-                return data
-            else:
                 return {
                     'success': False,
-                    'error': f'HTTP request failed with status: {response.status_code}'
+                    'error': stderr,
+                    'output': stderr
                 }
+                
         except Exception as e:
             return {
                 'success': False,
@@ -466,32 +280,48 @@ class HTTPAgentConnectionManager(BaseConnectionManager):
             }
     
     async def get_firewall_status(self) -> Dict[str, Any]:
-        """Get firewall status via HTTP agent."""
-        return await self.execute_command('get_status')
+        """Get firewall status via tuxsec-cli."""
+        return await self.execute_command('get_status', module='firewalld')
     
     async def get_zones(self) -> List[Dict[str, Any]]:
-        """Get firewall zones via HTTP agent."""
-        result = await self.execute_command('get_zones')
-        return result.get('output', []) if result.get('success') else []
+        """Get firewall zones via tuxsec-cli."""
+        result = await self.execute_command('list_zones', module='firewalld')
+        if result.get('success'):
+            zones_data = result.get('result', {}).get('zones', [])
+            return zones_data if isinstance(zones_data, list) else []
+        return []
     
     async def get_rules(self) -> List[Dict[str, Any]]:
-        """Get firewall rules via HTTP agent."""
-        result = await self.execute_command('get_rules')
-        return result.get('output', []) if result.get('success') else []
+        """Get firewall rules via tuxsec-cli."""
+        # Get all zones first
+        zones_result = await self.get_zones()
+        rules = []
+        
+        # For each zone, get its configuration
+        for zone in zones_result:
+            zone_name = zone if isinstance(zone, str) else zone.get('name')
+            if zone_name:
+                zone_result = await self.execute_command('get_zone', {'zone': zone_name}, module='firewalld')
+                if zone_result.get('success'):
+                    zone_config = zone_result.get('result', {})
+                    rules.append({
+                        'zone': zone_name,
+                        'config': zone_config
+                    })
+        
+        return rules
     
     async def get_available_services(self) -> List[str]:
-        """Get list of available firewalld services via HTTP agent."""
-        result = await self.execute_command('get_services')
-        return result.get('output', []) if result.get('success') else []
+        """Get list of available firewalld services via tuxsec-cli."""
+        result = await self.execute_command('list_services', module='firewalld')
+        if result.get('success'):
+            services = result.get('result', {}).get('services', [])
+            return services if isinstance(services, list) else []
+        return []
 
 
-class ServerToAgentConnectionManager(HTTPAgentConnectionManager):
-    """Server-to-agent connection manager (extends HTTP agent)."""
-    pass
-
-
-class AgentToServerConnectionManager(BaseConnectionManager):
-    """Agent-to-server connection manager (agents connect to us)."""
+class AgentToServerManager(BaseConnectionManager):
+    """Pull mode - Agent polls server for commands (agent_to_server connection type)."""
     
     async def test_connection(self) -> Dict[str, Any]:
         """Test if agent has connected recently."""
@@ -500,7 +330,7 @@ class AgentToServerConnectionManager(BaseConnectionManager):
             if time_diff < timedelta(minutes=5):
                 return {
                     'success': True,
-                    'connection_type': 'Agent to Server',
+                    'connection_type': 'Pull Mode (Agent to Server)',
                     'last_seen': self.agent.last_seen.isoformat(),
                     'message': 'Agent connected recently'
                 }
@@ -510,13 +340,13 @@ class AgentToServerConnectionManager(BaseConnectionManager):
             'error': 'Agent has not connected recently or never connected'
         }
     
-    async def execute_command(self, command: str, parameters: Optional[Dict] = None) -> Dict[str, Any]:
-        """Queue command for agent to execute on next connection."""
+    async def execute_command(self, command: str, parameters: Optional[Dict] = None, module: str = 'firewalld') -> Dict[str, Any]:
+        """Queue command for agent to execute on next poll."""
         try:
             # Create a pending command
             agent_command = AgentCommand.objects.create(
                 agent=self.agent,
-                command=command,
+                command=f"{module}.{command}",
                 parameters=json.dumps(parameters) if parameters else '',
                 status='pending'
             )
@@ -533,23 +363,145 @@ class AgentToServerConnectionManager(BaseConnectionManager):
             }
     
     async def get_firewall_status(self) -> Dict[str, Any]:
-        """Get firewall status (queued command)."""
-        return await self.execute_command('get_status')
+        """Queue get_status command."""
+        return await self.execute_command('get_status', module='firewalld')
     
     async def get_zones(self) -> List[Dict[str, Any]]:
-        """Get firewall zones (queued command)."""
-        result = await self.execute_command('get_zones')
-        return []  # Will be available after agent processes the command
+        """Queue list_zones command."""
+        result = await self.execute_command('list_zones', module='firewalld')
+        # Note: This queues the command, actual results come later
+        return []
     
     async def get_rules(self) -> List[Dict[str, Any]]:
-        """Get firewall rules (queued command)."""
-        result = await self.execute_command('get_rules')
-        return []  # Will be available after agent processes the command
+        """Queue command to get rules."""
+        # Note: This queues commands, actual results come later
+        return []
     
     async def get_available_services(self) -> List[str]:
-        """Get list of available firewalld services (queued command)."""
-        result = await self.execute_command('get_services')
-        return []  # Will be available after agent processes the command
+        """Queue command to get services."""
+        result = await self.execute_command('list_services', module='firewalld')
+        return []
+
+
+class ServerToAgentManager(BaseConnectionManager):
+    """Push mode - Server connects to agent (server_to_agent connection type)."""
+    
+    def __init__(self, agent: Agent):
+        super().__init__(agent)
+        self.base_url = f"https://{agent.ip_address}:{agent.agent_port}"
+        self.headers = {}
+        
+        if agent.agent_api_key:
+            self.headers['X-API-Key'] = agent.agent_api_key
+    
+    async def test_connection(self) -> Dict[str, Any]:
+        """Test HTTPS connection to agent."""
+        try:
+            response = requests.get(
+                f"{self.base_url}/health", 
+                headers=self.headers,
+                verify=False,  # TODO: Implement cert verification
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    'success': True,
+                    'connection_type': 'Push Mode (Server to Agent)',
+                    'agent_version': data.get('version', 'Unknown'),
+                    'modules': data.get('modules', []),
+                    'message': 'Agent connection successful'
+                }
+            else:
+                return {
+                    'success': False,
+                    'error': f'Agent returned status code: {response.status_code}'
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Agent connection failed: {str(e)}'
+            }
+    
+    async def execute_command(self, command: str, parameters: Optional[Dict] = None, module: str = 'firewalld') -> Dict[str, Any]:
+        """Execute command on agent via HTTPS POST."""
+        try:
+            payload = {
+                'module': module,
+                'action': command,
+                'params': parameters or {}
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/execute",
+                json=payload,
+                headers=self.headers,
+                verify=False,  # TODO: Implement cert verification
+                timeout=30
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Log the command
+                AgentCommand.objects.create(
+                    agent=self.agent,
+                    command=f"{module}.{command}",
+                    parameters=json.dumps(parameters) if parameters else '',
+                    result=json.dumps(data.get('result', {})),
+                    status='completed' if data.get('success') else 'failed'
+                )
+                
+                return data
+            else:
+                return {
+                    'success': False,
+                    'error': f'HTTP request failed with status: {response.status_code}'
+                }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def get_firewall_status(self) -> Dict[str, Any]:
+        """Get firewall status from agent."""
+        return await self.execute_command('get_status', module='firewalld')
+    
+    async def get_zones(self) -> List[Dict[str, Any]]:
+        """Get firewall zones from agent."""
+        result = await self.execute_command('list_zones', module='firewalld')
+        if result.get('success'):
+            zones = result.get('result', {}).get('zones', [])
+            return zones if isinstance(zones, list) else []
+        return []
+    
+    async def get_rules(self) -> List[Dict[str, Any]]:
+        """Get firewall rules from agent."""
+        zones_result = await self.get_zones()
+        rules = []
+        
+        for zone in zones_result:
+            zone_name = zone if isinstance(zone, str) else zone.get('name')
+            if zone_name:
+                zone_result = await self.execute_command('get_zone', {'zone': zone_name}, module='firewalld')
+                if zone_result.get('success'):
+                    zone_config = zone_result.get('result', {})
+                    rules.append({
+                        'zone': zone_name,
+                        'config': zone_config
+                    })
+        
+        return rules
+    
+    async def get_available_services(self) -> List[str]:
+        """Get list of available firewalld services from agent."""
+        result = await self.execute_command('list_services', module='firewalld')
+        if result.get('success'):
+            services = result.get('result', {}).get('services', [])
+            return services if isinstance(services, list) else []
+        return []
 
 
 def get_connection_manager(agent: Agent) -> BaseConnectionManager:
@@ -557,6 +509,6 @@ def get_connection_manager(agent: Agent) -> BaseConnectionManager:
     if agent.connection_type == 'ssh':
         return SSHConnectionManager(agent)
     elif agent.connection_type == 'server_to_agent':
-        return ServerToAgentConnectionManager(agent)
-    else:  # agent_to_server
-        return AgentToServerConnectionManager(agent)
+        return ServerToAgentManager(agent)
+    else:  # agent_to_server (pull mode)
+        return AgentToServerManager(agent)
