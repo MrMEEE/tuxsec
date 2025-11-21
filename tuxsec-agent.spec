@@ -24,7 +24,6 @@ Requires(postun): systemd
 
 # Require either system packages or venv
 Requires:       (tuxsec-agent-venv = %{version}-%{release} or (python3-pyyaml and python3-httpx and python3-aiohttp))
-BuildArch:      noarch
 
 %description
 TuxSec Agent provides secure, modular system management for Linux servers.
