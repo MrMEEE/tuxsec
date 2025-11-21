@@ -38,6 +38,13 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+6. Start the agent sync daemon (for auto-sync):
+```bash
+python manage.py sync_agents --daemon
+```
+
+Or set up a systemd service or cron job for production.
+
 ## Configuration
 
 Environment variables:

@@ -1751,11 +1751,13 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Note: Real-time updates are handled by the agent's connection mode:
-    // - SSH mode: Manual updates only (via Test Connection, Sync Firewall buttons)
-    // - Pull mode (agent_to_server): Agent polls server at configured interval
-    // - Push mode (server_to_agent): Server pushes updates to agent
-    // Frontend does not auto-poll to avoid unnecessary load
+    // Note: Real-time updates are handled by the backend sync_agents management command:
+    // - All connection modes (SSH, pull, push) sync at intervals defined in agent.sync_interval_seconds
+    // - SSH mode: Server initiates SSH connection to agent at sync interval
+    // - Pull mode: Agent polls server at sync interval  
+    // - Push mode: Server pushes to agent at sync interval
+    // Frontend only displays current data - no auto-polling to reduce load
+    // Use "Test Connection" or "Sync Firewall" buttons for manual updates
 });
 </script>
 {% endblock %}

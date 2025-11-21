@@ -28,3 +28,8 @@
 2025-11-20 21:18:42,416 - database_manager - INFO - {"event": "Database initialized successfully", "logger": "database_manager", "level": "info", "timestamp": "2025-11-20T20:18:42.415994Z"}
 2025-11-20 21:18:42,416 - api_server - INFO - {"event": "Certificate manager disabled (no CA certificate found)", "logger": "api_server", "level": "info", "timestamp": "2025-11-20T20:18:42.416165Z"}
 2025-11-20 21:18:42,416 - api_server - INFO - {"host": "127.0.0.1", "port": 8000, "event": "API server started", "logger": "api_server", "level": "info", "timestamp": "2025-11-20T20:18:42.416252Z"}
+2025-11-21 15:37:33,626 - api_server - INFO - {"component": "api_server", "log_level": "INFO", "log_file": "./logs/firewalld_central.log", "event": "Logging initialized", "logger": "api_server", "level": "info", "timestamp": "2025-11-21T14:37:33.626144Z"}
+2025-11-21 15:37:33,626 - api_server - INFO - {"event": "Redis disabled for development", "logger": "api_server", "level": "info", "timestamp": "2025-11-21T14:37:33.626294Z"}
+2025-11-21 15:37:33,635 - database_manager - INFO - {"event": "Database initialized successfully", "logger": "database_manager", "level": "info", "timestamp": "2025-11-21T14:37:33.635615Z"}
+2025-11-21 15:37:33,635 - api_server - INFO - {"event": "Certificate manager disabled (no CA certificate found)", "logger": "api_server", "level": "info", "timestamp": "2025-11-21T14:37:33.635728Z"}
+2025-11-21 15:37:33,635 - api_server - INFO - {"host": "127.0.0.1", "port": 8000, "event": "API server started", "logger": "api_server", "level": "info", "timestamp": "2025-11-21T14:37:33.635819Z"}
