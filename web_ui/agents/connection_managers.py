@@ -6,6 +6,7 @@ import json
 import paramiko
 import requests
 import subprocess
+from io import StringIO
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
 from .models import Agent, AgentCommand
@@ -62,8 +63,33 @@ class SSHConnectionManager(BaseConnectionManager):
                 'timeout': 30,
             }
             
-            if self.agent.ssh_key_path:
-                connect_kwargs['key_filename'] = self.agent.ssh_key_path
+            # Handle SSH private key (stored as string content in database)
+            if self.agent.ssh_private_key:
+                try:
+                    # Load key from string
+                    key_file = StringIO(self.agent.ssh_private_key)
+                    pkey = paramiko.RSAKey.from_private_key(key_file)
+                    connect_kwargs['pkey'] = pkey
+                except Exception as e:
+                    # Try DSA key if RSA fails
+                    try:
+                        key_file = StringIO(self.agent.ssh_private_key)
+                        pkey = paramiko.DSSKey.from_private_key(key_file)
+                        connect_kwargs['pkey'] = pkey
+                    except Exception:
+                        # Try ECDSA key
+                        try:
+                            key_file = StringIO(self.agent.ssh_private_key)
+                            pkey = paramiko.ECDSAKey.from_private_key(key_file)
+                            connect_kwargs['pkey'] = pkey
+                        except Exception:
+                            # Try Ed25519 key
+                            try:
+                                key_file = StringIO(self.agent.ssh_private_key)
+                                pkey = paramiko.Ed25519Key.from_private_key(key_file)
+                                connect_kwargs['pkey'] = pkey
+                            except Exception:
+                                raise ValueError(f"Could not load SSH private key: {e}")
             elif self.agent.ssh_password:
                 connect_kwargs['password'] = self.agent.ssh_password
             
