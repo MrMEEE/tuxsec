@@ -13,6 +13,10 @@ Source0:        %{name}-%{version}.tar.gz
 # Filter out build directory dependencies from venv package
 %global __requires_exclude_from ^/opt/tuxsec/venv/.*$
 
+# Filter out automatic Python dependencies from base package
+# The venv package will provide these instead
+%global __requires_exclude ^python.*dist\\((aiohttp|httpx|pyyaml)\\)
+
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-pip
@@ -53,6 +57,9 @@ The systeminfo module is included in the base package.
 Summary:        TuxSec Agent with bundled Python dependencies in virtualenv
 Requires:       tuxsec-agent = %{version}-%{release}
 Provides:       tuxsec-agent-python-deps = %{version}-%{release}
+Provides:       python3dist(pyyaml) >= 5.0
+Provides:       python3dist(httpx) >= 0.20
+Provides:       python3dist(aiohttp) >= 3.7
 
 %description -n tuxsec-agent-venv
 Self-contained virtual environment for TuxSec Agent with all Python
