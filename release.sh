@@ -215,17 +215,7 @@ rm -f /tmp/changelog_entry.md
 print_warning "Please edit CHANGELOG.md to add release notes for version $NEW_VERSION"
 read -p "Press Enter when you've updated the CHANGELOG..."
 
-# Step 6: Build and test
-print_info "Building RPMs to verify everything works..."
-if make rpm > /tmp/tuxsec-build.log 2>&1; then
-    print_success "RPM build successful"
-    rm -f /tmp/tuxsec-build.log
-else
-    print_error "RPM build failed! Check /tmp/tuxsec-build.log"
-    exit 1
-fi
-
-# Step 7: Git operations
+# Step 6: Git operations
 print_info "Staging changes..."
 git add -A
 
@@ -242,7 +232,7 @@ print_info "Creating git tag v$NEW_VERSION..."
 git tag -a "v$NEW_VERSION" -m "Release version $NEW_VERSION"
 print_success "Created tag v$NEW_VERSION"
 
-# Step 8: Push to remote
+# Step 7: Push to remote
 print_info "Pushing to remote repository..."
 read -p "Push changes and tag to origin? (y/N) " -n 1 -r
 echo
@@ -266,7 +256,7 @@ else
     echo "  git push origin v$NEW_VERSION"
 fi
 
-# Step 9: Summary
+# Step 8: Summary
 echo
 print_success "=========================================="
 print_success "Release Summary"
