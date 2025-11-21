@@ -1,7 +1,7 @@
 # TuxSec Agent - Makefile for RPM building
 
 NAME = tuxsec-agent
-VERSION = 2.0.0
+VERSION = $(shell grep "^Version:" $(NAME).spec | awk '{print $$2}' | tr -d ' ')
 RELEASE = 1
 
 TARBALL = $(NAME)-$(VERSION).tar.gz
