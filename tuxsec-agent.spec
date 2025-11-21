@@ -32,7 +32,6 @@ Requires(postun): systemd
 # 1. tuxsec-agent-venv (bundled dependencies) - RECOMMENDED
 # 2. System-installed python3-pyyaml, python3-httpx, python3-aiohttp
 Recommends:     tuxsec-agent-venv = %{version}-%{release}
-BuildArch:      noarch
 
 %description
 TuxSec Agent provides secure, modular system management for Linux servers.
@@ -77,7 +76,6 @@ No internet connection is required after installation.
 Summary:        TuxSec Agent firewalld module
 Requires:       tuxsec-agent = %{version}-%{release}
 Requires:       firewalld
-BuildArch:      noarch
 
 %description -n tuxsec-agent-firewalld
 Firewalld management module for TuxSec Agent.
@@ -99,7 +97,6 @@ Requires:       selinux-policy
 Requires(post): policycoreutils
 Requires(post): selinux-policy-targeted
 Requires(postun): policycoreutils
-BuildArch:      noarch
 
 %description -n tuxsec-agent-selinux
 SELinux policy module for TuxSec Agent. Provides the necessary security
