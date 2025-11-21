@@ -15,22 +15,6 @@ BuildRequires:  systemd-rpm-macros
 # For SELinux subpackage
 BuildRequires:  selinux-policy-devel
 
-%description
-TuxSec Agent provides secure, modular system management for Linux servers.
-It uses a two-component architecture that separates privileged operations
-from network communication.
-
-The agent consists of:
-- tuxsec-rootd: Root daemon exposing modular capabilities via Unix socket
-- tuxsec-agent: Unprivileged agent bridging server and root daemon
-
-Supports three connection modes: pull, push, and SSH.
-
-#######################
-# Base Package
-#######################
-%package -n tuxsec-agent
-Summary:        TuxSec Agent base package
 Requires:       python3 >= 3.8
 Requires:       python3-pyyaml >= 6.0
 Requires:       python3-httpx >= 0.24
@@ -41,10 +25,16 @@ Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
 
-%description -n tuxsec-agent
-Base TuxSec agent package including the root daemon, userspace agent,
-CLI tool, and setup utility. This package provides the core functionality
-for managing Linux systems through the TuxSec platform.
+%description
+TuxSec Agent provides secure, modular system management for Linux servers.
+It uses a two-component architecture that separates privileged operations
+from network communication.
+
+The agent consists of:
+- tuxsec-rootd: Root daemon exposing modular capabilities via Unix socket
+- tuxsec-agent: Unprivileged agent bridging server and root daemon
+
+Supports three connection modes: pull, push, and SSH.
 
 The systeminfo module is included in the base package.
 
