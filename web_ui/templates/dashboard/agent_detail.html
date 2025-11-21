@@ -1077,14 +1077,14 @@ function checkForUpdates() {
                 
                 // Update operating system
                 const osElement = document.querySelector('[data-field="operating_system"]');
-                if (osElement && data.operating_system) {
-                    osElement.textContent = data.operating_system;
+                if (osElement) {
+                    osElement.textContent = data.operating_system || 'Unknown';
                 }
                 
                 // Update version
                 const versionElement = document.querySelector('[data-field="version"]');
-                if (versionElement && data.version) {
-                    versionElement.textContent = data.version;
+                if (versionElement) {
+                    versionElement.textContent = data.version || 'Unknown';
                 }
                 
                 // Update last seen
