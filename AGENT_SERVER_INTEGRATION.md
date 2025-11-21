@@ -202,21 +202,36 @@ async def execute_command(self, command: str, parameters: Optional[Dict] = None)
 }
 ```
 
-### 3. Module Discovery
+### 3. Module Discovery and Heartbeat
 
-Agents report available modules during registration/heartbeat:
+Agents report available modules during registration and heartbeat:
 
-```python
-# Agent reports capabilities
+**Agent Heartbeat (POST /api/heartbeat):**
+```json
 {
     "agent_id": "uuid",
-    "modules": ["systeminfo", "firewalld"],
+    "status": "online",
+    "available_modules": ["systeminfo", "firewalld", "selinux"],
     "version": "0.1.0",
-    "os": "Rocky Linux 9.3"
+    "timestamp": "2025-11-21T10:30:00Z",
+    "system_info": {
+        "os": "Rocky Linux 9.3",
+        "kernel": "5.14.0-362.8.1.el9_3.x86_64"
+    }
 }
 ```
 
-Server stores this in `Agent.available_services` (JSON field).
+**Server Storage:**
+- API Server: Stores in `Agent.available_modules` (JSON field in PostgreSQL)
+- Web UI: Stores in `Agent.available_modules` (JSONField in Django/SQLite)
+
+**Heartbeat Frequency:**
+- Pull mode: Agent sends heartbeat every poll interval (default 60s)
+- Push mode: Agent sends heartbeat on startup and every 5 minutes
+- SSH mode: Server queries via `tuxsec-cli execute systeminfo get_info` on demand
+
+**Module Availability in UI:**
+Server checks `agent.available_modules` before showing firewall/SELinux options to users.
 
 ## Current Implementation Status
 
@@ -231,23 +246,24 @@ Server stores this in `Agent.available_services` (JSON field).
 
 ### ⚠️ Needs Updates (for v0.1.0 Agent)
 
-1. **SSH Commands** - Update to use `tuxsec-cli` instead of direct `firewall-cmd`
-   - Current: `firewall-cmd --add-service=http`
+1. ~~**SSH Commands**~~ ✅ **DONE** - Updated to use `tuxsec-cli`
+   - Old: `firewall-cmd --add-service=http`
    - New: `tuxsec-cli execute firewalld add_service --param service=http`
 
-2. **Command Structure** - Add module field to commands
-   - Current: `{'command': 'add_service', 'parameters': {...}}`
+2. ~~**Command Structure**~~ ✅ **DONE** - Added module field to commands
+   - Old: `{'command': 'add_service', 'parameters': {...}}`
    - New: `{'module': 'firewalld', 'action': 'add_service', 'params': {...}}`
 
-3. **Module Support** - Track available modules per agent
-   - Store systeminfo, firewalld, selinux, aide availability
-   - Disable UI features if module not available
+3. ~~**Module Support**~~ ✅ **DONE** - Track available modules per agent
+   - Store systeminfo, firewalld, selinux, aide availability via heartbeat
+   - Heartbeat endpoint: POST /api/heartbeat with available_modules list
+   - Stored in Agent.available_modules (JSON field)
 
 4. **API Key Auth** - Implement in push/pull modes
    - Add `X-API-Key` header validation
    - Generate API keys during agent setup
 
-5. **Response Parsing** - Handle new response format
+5. ~~**Response Parsing**~~ ✅ **DONE** - Handle new response format
    - Expect nested result structure
    - Parse module-specific data
 

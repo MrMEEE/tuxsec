@@ -47,7 +47,9 @@ class AgentInfo(BaseModel):
     position_x: float = 0
     position_y: float = 0
     certificate_issued: bool = False
+    available_modules: List[str] = Field(default_factory=list, description="Available modules on the agent")
     created_at: datetime
+    updated_at: datetime
     updated_at: datetime
 
 
@@ -98,6 +100,16 @@ class AgentStatusUpdate(BaseModel):
     status: AgentStatus
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     details: Optional[Dict[str, Any]] = None
+
+
+class AgentHeartbeat(BaseModel):
+    """Agent heartbeat with module availability"""
+    agent_id: str
+    status: AgentStatus = AgentStatus.ONLINE
+    available_modules: List[str] = Field(default_factory=list, description="List of available modules (e.g., ['systeminfo', 'firewalld', 'selinux'])")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    version: Optional[str] = None
+    system_info: Optional[Dict[str, Any]] = None
 
 
 class WhiteboardState(BaseModel):

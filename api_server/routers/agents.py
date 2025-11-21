@@ -4,7 +4,7 @@ from typing import List
 from datetime import datetime
 
 from ..database import get_db, Agent
-from ..schemas import AgentRegistration, AgentInfo, AgentStatusUpdate
+from ..schemas import AgentRegistration, AgentInfo, AgentStatusUpdate, AgentHeartbeat
 from ..agent_manager import AgentManager
 
 router = APIRouter()
@@ -79,6 +79,41 @@ async def update_agent_status(
     db.commit()
     
     return {"message": "Status updated successfully"}
+
+
+@router.post("/heartbeat")
+async def agent_heartbeat(
+    heartbeat: AgentHeartbeat,
+    db: Session = Depends(get_db)
+):
+    """
+    Agent heartbeat endpoint - updates status, last_seen, and available modules.
+    Agents should call this periodically to report their health and capabilities.
+    """
+    agent = db.query(Agent).filter(Agent.id == heartbeat.agent_id).first()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    
+    # Update agent status and last seen
+    agent.status = heartbeat.status.value
+    agent.last_seen = heartbeat.timestamp
+    agent.updated_at = datetime.utcnow()
+    
+    # Update available modules
+    if heartbeat.available_modules:
+        agent.available_modules = heartbeat.available_modules
+    
+    # Update version if provided
+    if heartbeat.version:
+        agent.version = heartbeat.version
+    
+    db.commit()
+    
+    return {
+        "message": "Heartbeat received",
+        "agent_id": agent.id,
+        "modules_registered": len(heartbeat.available_modules) if heartbeat.available_modules else 0
+    }
 
 
 @router.delete("/{agent_id}")
