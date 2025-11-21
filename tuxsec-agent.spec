@@ -7,7 +7,6 @@ License:        MIT
 URL:            https://github.com/MrMEEE/tuxsec
 Source0:        %{name}-%{version}.tar.gz
 
-BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-pip
@@ -25,6 +24,7 @@ Requires(postun): systemd
 
 # Require either system packages or venv
 Requires:       (tuxsec-agent-venv = %{version}-%{release} or (python3-pyyaml and python3-httpx and python3-aiohttp))
+BuildArch:      noarch
 
 %description
 TuxSec Agent provides secure, modular system management for Linux servers.
@@ -69,6 +69,7 @@ No internet connection is required after installation.
 Summary:        TuxSec Agent firewalld module
 Requires:       tuxsec-agent = %{version}-%{release}
 Requires:       firewalld
+BuildArch:      noarch
 
 %description -n tuxsec-agent-firewalld
 Firewalld management module for TuxSec Agent.
@@ -90,6 +91,7 @@ Requires:       selinux-policy
 Requires(post): policycoreutils
 Requires(post): selinux-policy-targeted
 Requires(postun): policycoreutils
+BuildArch:      noarch
 
 %description -n tuxsec-agent-selinux
 SELinux policy module for TuxSec Agent. Provides the necessary security
