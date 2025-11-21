@@ -16,7 +16,7 @@ jobs:
       - name: Install build dependencies
         run: |
           dnf install -y epel-release
-          dnf install -y rpm-build python3-devel python3-pip git make selinux-policy-devel \
+          dnf install -y rpm-build python3-devel python3-pip python3-setuptools git make selinux-policy-devel \
             systemd firewalld
 
       - name: Checkout code
@@ -78,7 +78,7 @@ jobs:
       - name: Install build dependencies
         run: |
           dnf install -y epel-release || true
-          dnf install -y rpm-build python3-devel python3-pip git make selinux-policy-devel \
+          dnf install -y rpm-build python3-devel python3-pip python3-setuptools git make selinux-policy-devel \
             systemd firewalld
 
       - name: Checkout code
