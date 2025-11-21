@@ -10,20 +10,22 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
+BuildRequires:  python3-pip
+BuildRequires:  python3-virtualenv
 BuildRequires:  systemd-rpm-macros
 
 # For SELinux subpackage
 BuildRequires:  selinux-policy-devel
 
 Requires:       python3 >= 3.8
-Requires:       python3-pyyaml >= 5.0
-Requires:       python3-httpx >= 0.20
-Requires:       python3-aiohttp >= 3.7
 Requires:       systemd
 Requires(pre):  shadow-utils
 Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
+
+# Require either system packages or venv
+Requires:       (tuxsec-agent-venv = %{version}-%{release} or (python3-pyyaml and python3-httpx and python3-aiohttp))
 
 %description
 TuxSec Agent provides secure, modular system management for Linux servers.
@@ -37,6 +39,26 @@ The agent consists of:
 Supports three connection modes: pull, push, and SSH.
 
 The systeminfo module is included in the base package.
+
+#######################
+# Virtual Environment Package
+#######################
+%package -n tuxsec-agent-venv
+Summary:        TuxSec Agent with bundled Python dependencies in virtualenv
+Requires:       tuxsec-agent = %{version}-%{release}
+Provides:       tuxsec-agent-python-deps = %{version}-%{release}
+
+%description -n tuxsec-agent-venv
+Self-contained virtual environment for TuxSec Agent with all Python
+dependencies bundled. This package is recommended for systems where
+the required Python packages are not available in the distribution
+repositories.
+
+The virtual environment is installed to /opt/tuxsec/venv and includes:
+- PyYAML
+- httpx
+- aiohttp
+- All other required dependencies
 
 #######################
 # Firewalld Module
@@ -84,6 +106,11 @@ contexts and rules for the agent to operate correctly under SELinux.
 # Build Python package (no compilation needed for noarch)
 %py3_build
 
+# Build virtualenv with dependencies
+python3 -m venv %{_builddir}/venv
+%{_builddir}/venv/bin/pip install --upgrade pip
+%{_builddir}/venv/bin/pip install PyYAML httpx aiohttp
+
 # Build SELinux policy
 cd agent/selinux
 make -f /usr/share/selinux/devel/Makefile tuxsec.pp
@@ -95,6 +122,10 @@ cd ../..
 %install
 # Install Python package
 %py3_install
+
+# Install virtualenv
+mkdir -p %{buildroot}/opt/tuxsec
+cp -a %{_builddir}/venv %{buildroot}/opt/tuxsec/
 
 # Install systemd service files
 install -D -m 0644 agent/systemd/tuxsec-rootd.service %{buildroot}%{_unitdir}/tuxsec-rootd.service
@@ -109,26 +140,42 @@ install -D -m 0755 %{buildroot}%{python3_sitelib}/agent/userspace/agent.py %{bui
 install -D -m 0755 %{buildroot}%{python3_sitelib}/agent/userspace/cli.py %{buildroot}%{_bindir}/tuxsec-cli
 install -D -m 0755 %{buildroot}%{python3_sitelib}/agent/userspace/setup.py %{buildroot}%{_bindir}/tuxsec-setup
 
-# Create wrapper scripts for executables
+# Create wrapper scripts for executables that can use either system Python or venv
 cat > %{buildroot}%{_bindir}/tuxsec-rootd << 'EOF'
 #!/bin/bash
-exec /usr/bin/python3 -m agent.rootd.daemon "$@"
+if [ -d /opt/tuxsec/venv ]; then
+    exec /opt/tuxsec/venv/bin/python3 -m agent.rootd.daemon "$@"
+else
+    exec /usr/bin/python3 -m agent.rootd.daemon "$@"
+fi
 EOF
 
 cat > %{buildroot}%{_bindir}/tuxsec-agent << 'EOF'
 #!/bin/bash
-exec /usr/bin/python3 -m agent.userspace.agent "$@"
+if [ -d /opt/tuxsec/venv ]; then
+    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.agent "$@"
+else
+    exec /usr/bin/python3 -m agent.userspace.agent "$@"
+fi
 EOF
 
 cat > %{buildroot}%{_bindir}/tuxsec-cli << 'EOF'
 #!/bin/bash
-exec /usr/bin/python3 -m agent.userspace.cli "$@"
+if [ -d /opt/tuxsec/venv ]; then
+    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.cli "$@"
+else
+    exec /usr/bin/python3 -m agent.userspace.cli "$@"
+fi
 EOF
 
 cat > %{buildroot}%{_bindir}/tuxsec-setup << 'EOF'
-#!/usr/bin/python3
-import sys
-from agent.userspace.setup import main
+#!/bin/bash
+if [ -d /opt/tuxsec/venv ]; then
+    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.setup "$@"
+else
+    exec /usr/bin/python3 -m agent.userspace.setup "$@"
+fi
+EOF
 sys.exit(main())
 EOF
 
@@ -282,6 +329,9 @@ fi
 %dir %attr(0755,tuxsec,tuxsec) %{_localstatedir}/log/tuxsec
 %dir %attr(0770,root,tuxsec) %{_rundir}/tuxsec
 %dir %attr(0755,tuxsec,tuxsec) %{_sharedstatedir}/tuxsec
+
+%files -n tuxsec-agent-venv
+/opt/tuxsec/venv/
 
 %files -n tuxsec-agent-firewalld
 %{python3_sitelib}/agent/rootd/modules/firewalld.py
