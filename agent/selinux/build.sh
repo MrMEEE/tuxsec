@@ -8,11 +8,18 @@ POLICY_VERSION="1.0.0"
 
 echo "Building SELinux policy module for TuxSec..."
 
-# Compile the policy
-checkmodule -M -m -o ${POLICY_NAME}.mod ${POLICY_NAME}.te
-
-# Create the policy package
-semodule_package -o ${POLICY_NAME}.pp -m ${POLICY_NAME}.mod -fc ${POLICY_NAME}.fc
+# Make using the standard make approach for SELinux modules
+if [ -f "/usr/share/selinux/devel/Makefile" ]; then
+    # Use the SELinux development Makefile (preferred method)
+    make -f /usr/share/selinux/devel/Makefile ${POLICY_NAME}.pp
+else
+    # Fallback to manual compilation
+    checkmodule -M -m -o ${POLICY_NAME}.mod ${POLICY_NAME}.te
+    semodule_package -o ${POLICY_NAME}.pp -m ${POLICY_NAME}.mod
+    if [ -f ${POLICY_NAME}.fc ]; then
+        semodule_package -o ${POLICY_NAME}.pp -m ${POLICY_NAME}.mod -fc ${POLICY_NAME}.fc
+    fi
+fi
 
 echo "SELinux policy module built successfully: ${POLICY_NAME}.pp"
 echo ""
