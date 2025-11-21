@@ -24,6 +24,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure git safe directory
+        run: |
+          git config --global --add safe.directory /__w/tuxsec/tuxsec
+
       - name: Get version from tag
         id: version
         run: |
@@ -81,6 +85,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Configure git safe directory
+        run: |
+          git config --global --add safe.directory /__w/tuxsec/tuxsec
 
       - name: Get version from tag
         id: version
