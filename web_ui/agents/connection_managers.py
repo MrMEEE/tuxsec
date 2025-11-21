@@ -194,14 +194,17 @@ class SSHConnectionManager(BaseConnectionManager):
                 try:
                     system_info = json.loads(stdout)
                     if system_info.get('success'):
-                        info = system_info.get('result', {})
+                        # tuxsec-cli returns {success, data, error} format
+                        info = system_info.get('data', {})
                         
                         # Update agent metadata
                         if info.get('os'):
                             self.agent.operating_system = info['os']
                         if info.get('version'):
                             self.agent.version = info['version']
-                        self.agent.save(update_fields=['operating_system', 'version'])
+                        if info.get('modules'):
+                            self.agent.available_modules = info['modules']
+                        self.agent.save(update_fields=['operating_system', 'version', 'available_modules'])
                         
                         return {
                             'success': True,
