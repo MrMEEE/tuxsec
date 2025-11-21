@@ -22,6 +22,7 @@ import json
 import threading
 import importlib
 import pkgutil
+import grp
 from pathlib import Path
 from typing import Optional
 import uuid
@@ -116,11 +117,15 @@ class RootDaemon:
         self.server_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.server_socket.bind(self.socket_path)
         
-        # Set socket permissions (only tuxsec user can connect)
+        # Set socket permissions (owner: root, group: tuxsec, mode: 0660)
         os.chmod(self.socket_path, 0o660)
         
-        # TODO: Change group ownership to 'tuxsec' group
-        # os.chown(self.socket_path, -1, tuxsec_gid)
+        # Change group ownership to 'tuxsec' group so tuxsec user can connect
+        try:
+            tuxsec_gid = grp.getgrnam('tuxsec').gr_gid
+            os.chown(self.socket_path, -1, tuxsec_gid)
+        except KeyError:
+            self.logger.warning("Group 'tuxsec' not found, socket will be owned by root:root")
         
         self.server_socket.listen(5)
         self.logger.info(f"Listening on {self.socket_path}")

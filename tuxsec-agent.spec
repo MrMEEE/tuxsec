@@ -1,5 +1,5 @@
 Name:           tuxsec-agent
-Version:        0.1.7
+Version:        0.1.8
 Release:        1%{?dist}
 Summary:        TuxSec Agent - Secure Linux System Management
 
@@ -365,10 +365,16 @@ fi
 # Changelog
 #######################
 %changelog
+* Fri Jan 03 2025 MrMEEE <you@example.com> - 0.1.8-1
+- Fix socket group ownership in tuxsec-rootd
+- Socket now owned by root:tuxsec with 0660 permissions
+- Allows tuxsec user to connect to rootd socket
+
 * Fri Jan 03 2025 MrMEEE <you@example.com> - 0.1.7-1
 - Fix wrapper scripts to properly expand RPM macros for PYTHONPATH
 - Use non-quoted heredoc to allow macro substitution
 - Escape shell variables to prevent expansion during build
+- Fix systemd services to call wrapper scripts instead of python3 directly
 
 * Fri Jan 03 2025 MrMEEE <you@example.com> - 0.1.6-1
 - Fix wrapper scripts to set PYTHONPATH for venv/system integration
