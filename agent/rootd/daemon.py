@@ -20,14 +20,14 @@ import signal
 import logging
 import json
 import threading
+import importlib
+import pkgutil
 from pathlib import Path
 from typing import Optional
 import uuid
 
 from .base_module import ModuleRegistry
 from .protocol import Message, MessageType, CommandRequest, CommandResponse
-from .modules.systeminfo import SystemInfoModule
-from .modules.firewalld import FirewalldModule
 
 
 class RootDaemon:
@@ -57,25 +57,48 @@ class RootDaemon:
         return logging.getLogger('tuxsec-rootd')
     
     def _load_modules(self):
-        """Load and register all available modules."""
+        """Load and register all available modules dynamically."""
         self.logger.info("Loading modules...")
         
-        # System info module (always loaded)
-        systeminfo = SystemInfoModule()
-        success, error = self.registry.register_module(systeminfo)
-        if not success:
-            self.logger.error(f"Failed to load systeminfo module: {error}")
+        # Import the modules package
+        from . import modules
         
-        # Firewalld module (optional)
-        try:
-            firewalld = FirewalldModule()
-            success, error = self.registry.register_module(firewalld)
-            if not success:
-                self.logger.warning(f"Firewalld module not available: {error}")
-        except Exception as e:
-            self.logger.warning(f"Could not load firewalld module: {e}")
+        # Get the modules directory path
+        modules_path = Path(modules.__file__).parent
         
-        # TODO: Add more modules here (SELinux, AIDE, etc.)
+        # Discover all Python modules in the modules directory
+        for importer, module_name, ispkg in pkgutil.iter_modules([str(modules_path)]):
+            if module_name.startswith('_'):
+                # Skip private modules
+                continue
+            
+            try:
+                # Import the module
+                module = importlib.import_module(f'.modules.{module_name}', package='agent.rootd')
+                
+                # Find the module class (should end with 'Module')
+                module_class = None
+                for attr_name in dir(module):
+                    if attr_name.endswith('Module') and not attr_name.startswith('_'):
+                        attr = getattr(module, attr_name)
+                        # Check if it's a class and not the base class
+                        if isinstance(attr, type) and attr.__name__ != 'BaseModule':
+                            module_class = attr
+                            break
+                
+                if module_class:
+                    # Instantiate and register the module
+                    module_instance = module_class()
+                    success, error = self.registry.register_module(module_instance)
+                    if success:
+                        self.logger.info(f"Loaded module: {module_name}")
+                    else:
+                        self.logger.warning(f"Could not register {module_name}: {error}")
+                else:
+                    self.logger.warning(f"No module class found in {module_name}")
+                    
+            except Exception as e:
+                self.logger.warning(f"Could not load module {module_name}: {e}")
         
         self.logger.info(f"Loaded {len(self.registry.modules)} modules: {', '.join(self.registry.list_modules())}")
     
