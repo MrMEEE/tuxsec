@@ -390,12 +390,22 @@ def agent_test_connection(request, agent_id):
     try:
         # Import connection managers
         from .connection_managers import get_connection_manager
+        from datetime import datetime
         
         # Get the appropriate connection manager
         manager = get_connection_manager(agent)
         
         # Test the connection
         result = asyncio.run(manager.test_connection())
+        
+        # Update agent status based on connection test result
+        if result.get('success'):
+            agent.status = 'online'
+            agent.last_seen = datetime.now()
+            agent.save(update_fields=['status', 'last_seen'])
+        else:
+            agent.status = 'offline'
+            agent.save(update_fields=['status'])
         
         # Close connection if needed (for SSH)
         if hasattr(manager, 'close') and callable(getattr(manager, 'close')):
@@ -404,6 +414,10 @@ def agent_test_connection(request, agent_id):
         return JsonResponse(result)
         
     except Exception as e:
+        # Mark agent as offline on connection error
+        agent.status = 'offline'
+        agent.save(update_fields=['status'])
+        
         return JsonResponse({
             'success': False,
             'error': f'Connection test failed: {str(e)}'
