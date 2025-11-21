@@ -24,7 +24,7 @@ ExecStartPre=/bin/mkdir -p /var/log/tuxsec
 ExecStartPre=/bin/chown tuxsec:tuxsec /var/log/tuxsec
 
 # Start agent
-ExecStart=/usr/bin/python3 -m agent.userspace.agent --config /etc/tuxsec/agent.yaml
+ExecStart=/usr/bin/tuxsec-agent --config /etc/tuxsec/agent.yaml
 
 # Restart on failure
 Restart=on-failure

@@ -1,5 +1,5 @@
 Name:           tuxsec-agent
-Version:        0.1.6
+Version:        0.1.7
 Release:        1%{?dist}
 Summary:        TuxSec Agent - Secure Linux System Management
 
@@ -159,51 +159,43 @@ install -D -m 0755 %{buildroot}%{python3_sitelib}/agent/userspace/setup.py %{bui
 # Create wrapper scripts for executables that can use either system Python or venv
 # When using venv, we need to set PYTHONPATH to include the system site-packages
 # where the agent package is installed
-cat > %{buildroot}%{_bindir}/tuxsec-rootd << 'EOF'
+cat > %{buildroot}%{_bindir}/tuxsec-rootd << EOF
 #!/bin/bash
 if [ -d /opt/tuxsec/venv ]; then
-    # Get system site-packages path
-    SYSTEM_SITE=$(/usr/bin/python3 -c "import site; print(site.getsitepackages()[0])")
-    export PYTHONPATH="${SYSTEM_SITE}:${PYTHONPATH}"
-    exec /opt/tuxsec/venv/bin/python3 -m agent.rootd.daemon "$@"
+    export PYTHONPATH="%{python3_sitelib}:\${PYTHONPATH}"
+    exec /opt/tuxsec/venv/bin/python3 -m agent.rootd.daemon "\$@"
 else
-    exec /usr/bin/python3 -m agent.rootd.daemon "$@"
+    exec %{__python3} -m agent.rootd.daemon "\$@"
 fi
 EOF
 
-cat > %{buildroot}%{_bindir}/tuxsec-agent << 'EOF'
+cat > %{buildroot}%{_bindir}/tuxsec-agent << EOF
 #!/bin/bash
 if [ -d /opt/tuxsec/venv ]; then
-    # Get system site-packages path
-    SYSTEM_SITE=$(/usr/bin/python3 -c "import site; print(site.getsitepackages()[0])")
-    export PYTHONPATH="${SYSTEM_SITE}:${PYTHONPATH}"
-    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.agent "$@"
+    export PYTHONPATH="%{python3_sitelib}:\${PYTHONPATH}"
+    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.agent "\$@"
 else
-    exec /usr/bin/python3 -m agent.userspace.agent "$@"
+    exec %{__python3} -m agent.userspace.agent "\$@"
 fi
 EOF
 
-cat > %{buildroot}%{_bindir}/tuxsec-cli << 'EOF'
+cat > %{buildroot}%{_bindir}/tuxsec-cli << EOF
 #!/bin/bash
 if [ -d /opt/tuxsec/venv ]; then
-    # Get system site-packages path
-    SYSTEM_SITE=$(/usr/bin/python3 -c "import site; print(site.getsitepackages()[0])")
-    export PYTHONPATH="${SYSTEM_SITE}:${PYTHONPATH}"
-    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.cli "$@"
+    export PYTHONPATH="%{python3_sitelib}:\${PYTHONPATH}"
+    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.cli "\$@"
 else
-    exec /usr/bin/python3 -m agent.userspace.cli "$@"
+    exec %{__python3} -m agent.userspace.cli "\$@"
 fi
 EOF
 
-cat > %{buildroot}%{_bindir}/tuxsec-setup << 'EOF'
+cat > %{buildroot}%{_bindir}/tuxsec-setup << EOF
 #!/bin/bash
 if [ -d /opt/tuxsec/venv ]; then
-    # Get system site-packages path
-    SYSTEM_SITE=$(/usr/bin/python3 -c "import site; print(site.getsitepackages()[0])")
-    export PYTHONPATH="${SYSTEM_SITE}:${PYTHONPATH}"
-    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.setup "$@"
+    export PYTHONPATH="%{python3_sitelib}:\${PYTHONPATH}"
+    exec /opt/tuxsec/venv/bin/python3 -m agent.userspace.setup "\$@"
 else
-    exec /usr/bin/python3 -m agent.userspace.setup "$@"
+    exec %{__python3} -m agent.userspace.setup "\$@"
 fi
 EOF
 
@@ -373,6 +365,11 @@ fi
 # Changelog
 #######################
 %changelog
+* Fri Jan 03 2025 MrMEEE <you@example.com> - 0.1.7-1
+- Fix wrapper scripts to properly expand RPM macros for PYTHONPATH
+- Use non-quoted heredoc to allow macro substitution
+- Escape shell variables to prevent expansion during build
+
 * Fri Jan 03 2025 MrMEEE <you@example.com> - 0.1.6-1
 - Fix wrapper scripts to set PYTHONPATH for venv/system integration
 - Implement dynamic module loading system

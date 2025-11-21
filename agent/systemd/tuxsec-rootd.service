@@ -22,7 +22,7 @@ ExecStartPre=/bin/chown root:tuxsec /var/run/tuxsec
 ExecStartPre=/bin/chmod 0770 /var/run/tuxsec
 
 # Start daemon
-ExecStart=/usr/bin/python3 -m agent.rootd.daemon
+ExecStart=/usr/bin/tuxsec-rootd
 
 # Restart on failure
 Restart=on-failure
