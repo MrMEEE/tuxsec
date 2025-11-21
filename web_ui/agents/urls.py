@@ -32,6 +32,7 @@ urlpatterns = [
     path('<uuid:agent_id>/test-connection/', views.agent_test_connection, name='agent-test-connection'),
     path('<uuid:agent_id>/sync-firewall/', views.agent_sync_firewall, name='agent-sync-firewall'),
     path('<uuid:agent_id>/zones-data/', views.agent_zones_data, name='agent-zones-data'),
+    path('<uuid:agent_id>/status-data/', views.agent_status_data, name='agent-status-data'),
     path('<uuid:agent_id>/available-services/', views.agent_available_services, name='agent-available-services'),
     path('<uuid:agent_id>/module/<str:module_name>/toggle/', views.agent_module_toggle, name='agent-module-toggle'),
     

@@ -77,8 +77,9 @@ def agent_checkin(request):
         for command in pending_commands:
             commands_data.append({
                 'id': str(command.id),
-                'command': command.command_type,
-                'parameters': command.parameters
+                'module': command.module,
+                'action': command.action,
+                'params': command.params
             })
             # Mark as sent
             command.status = 'sent'
@@ -87,6 +88,7 @@ def agent_checkin(request):
         return JsonResponse({
             'success': True,
             'commands': commands_data,
+            'sync_interval': agent.sync_interval_seconds,
             'server_time': datetime.now().isoformat()
         })
         

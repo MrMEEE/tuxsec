@@ -183,11 +183,11 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Operating System:</label>
-                                <div>{{ agent.os_info|default:"Unknown" }}</div>
+                                <div data-field="operating_system">{{ agent.os_info|default:"Unknown" }}</div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Agent Version:</label>
-                                <div>
+                                <div data-field="version">
                                     {% if agent.connection_type == 'ssh' %}
                                         <span class="text-muted">None/SSH</span>
                                     {% else %}
@@ -204,7 +204,7 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Last Seen:</label>
-                                <div>
+                                <div data-field="last_seen">
                                     {% if agent.last_seen %}
                                         {{ agent.last_seen|date:'Y-m-d H:i:s' }}
                                         <br><small class="text-muted">({{ agent.last_seen|timesince }} ago)</small>
@@ -215,7 +215,7 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Last Sync:</label>
-                                <div>
+                                <div data-field="last_sync">
                                     {% if agent.last_sync %}
                                         {{ agent.last_sync|date:'Y-m-d H:i:s' }}
                                         <br><small class="text-muted">({{ agent.last_sync|timesince }} ago)</small>
@@ -1044,7 +1044,8 @@ function checkForUpdates() {
     isPolling = true;
     const agentId = '{{ agent.id }}';
     
-    fetch(`/agents/${agentId}/zones-data/`)
+    // Poll for zones data
+    const zonesPromise = fetch(`/agents/${agentId}/zones-data/`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -1059,7 +1060,55 @@ function checkForUpdates() {
                     // TODO: Update grouped rules display when implemented
                 }
             }
-        })
+        });
+    
+    // Poll for agent status/metadata
+    const statusPromise = fetch(`/agents/${agentId}/status-data/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update status indicator
+                const statusBadge = document.querySelector('.badge');
+                if (statusBadge) {
+                    const statusText = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+                    statusBadge.className = `badge bg-${data.status === 'online' ? 'success' : data.status === 'offline' ? 'danger' : 'warning'}`;
+                    statusBadge.textContent = statusText;
+                }
+                
+                // Update operating system
+                const osElement = document.querySelector('[data-field="operating_system"]');
+                if (osElement && data.operating_system) {
+                    osElement.textContent = data.operating_system;
+                }
+                
+                // Update version
+                const versionElement = document.querySelector('[data-field="version"]');
+                if (versionElement && data.version) {
+                    versionElement.textContent = data.version;
+                }
+                
+                // Update last seen
+                const lastSeenElement = document.querySelector('[data-field="last_seen"]');
+                if (lastSeenElement && data.last_seen) {
+                    const date = new Date(data.last_seen);
+                    lastSeenElement.textContent = date.toLocaleString();
+                }
+                
+                // Update last sync
+                const lastSyncElement = document.querySelector('[data-field="last_sync"]');
+                if (lastSyncElement) {
+                    if (data.last_sync) {
+                        const date = new Date(data.last_sync);
+                        lastSyncElement.textContent = date.toLocaleString();
+                    } else {
+                        lastSyncElement.textContent = 'Never';
+                    }
+                }
+            }
+        });
+    
+    // Wait for both to complete
+    Promise.all([zonesPromise, statusPromise])
         .catch(error => {
             console.error('Polling error:', error);
         })
@@ -1702,11 +1751,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Start polling for updates every 5 seconds
-    setInterval(checkForUpdates, 5000);
-    
-    // Do an initial check after 1 second
-    setTimeout(checkForUpdates, 1000);
+    // Note: Real-time updates are handled by the agent's connection mode:
+    // - SSH mode: Manual updates only (via Test Connection, Sync Firewall buttons)
+    // - Pull mode (agent_to_server): Agent polls server at configured interval
+    // - Push mode (server_to_agent): Server pushes updates to agent
+    // Frontend does not auto-poll to avoid unnecessary load
 });
 </script>
 {% endblock %}

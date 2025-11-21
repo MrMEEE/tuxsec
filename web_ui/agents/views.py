@@ -483,6 +483,22 @@ def agent_zones_data(request, agent_id):
 
 
 @login_required
+def agent_status_data(request, agent_id):
+    """Get agent status and metadata for dynamic updates."""
+    agent = get_object_or_404(Agent, id=agent_id)
+    
+    return JsonResponse({
+        'success': True,
+        'status': agent.status,
+        'last_seen': agent.last_seen.isoformat() if agent.last_seen else None,
+        'last_sync': agent.last_sync.isoformat() if agent.last_sync else None,
+        'operating_system': agent.operating_system or '',
+        'version': agent.version or '',
+        'available_modules': agent.available_modules or [],
+    })
+
+
+@login_required
 def agent_available_services(request, agent_id):
     """Get list of available firewalld services for this agent."""
     agent = get_object_or_404(Agent, id=agent_id)

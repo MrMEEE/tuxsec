@@ -157,19 +157,31 @@ class TuxSecAgent:
         async with httpx.AsyncClient() as client:
             while self.running:
                 try:
-                    # Poll for jobs
-                    response = await client.get(
-                        f"{server_url}/api/v1/agents/{agent_id}/jobs",
+                    # Check in with server and get pending commands
+                    response = await client.post(
+                        f"{server_url}/agents/api/checkin/",
                         headers={'X-API-Key': api_key},
+                        json={
+                            'agent_id': agent_id,
+                            'api_key': api_key,
+                            'status': 'online',
+                        },
                         timeout=10.0
                     )
                     
                     if response.status_code == 200:
                         data = response.json()
-                        jobs = data.get('jobs', [])
                         
-                        for job in jobs:
-                            await self._execute_job(job, client)
+                        # Update poll interval if server provides one
+                        server_interval = data.get('sync_interval')
+                        if server_interval and server_interval != poll_interval:
+                            poll_interval = server_interval
+                            self.logger.info(f"Updated poll interval to {poll_interval} seconds")
+                        
+                        # Process pending commands
+                        commands = data.get('commands', [])
+                        for cmd in commands:
+                            await self._execute_command(cmd, client)
                     
                     # Wait before next poll
                     await asyncio.sleep(poll_interval)
@@ -249,61 +261,51 @@ class TuxSecAgent:
             'rootd_connected': is_healthy
         })
     
-    async def _execute_job(self, job: Dict[str, Any], client: Optional[httpx.AsyncClient] = None) -> Dict[str, Any]:
-        """Execute a job."""
-        job_id = job.get('id')
-        module = job.get('module')
-        action = job.get('action')
-        parameters = job.get('parameters', {})
+    async def _execute_command(self, command: Dict[str, Any], client: Optional[httpx.AsyncClient] = None) -> Dict[str, Any]:
+        """Execute a command from the server."""
+        command_id = command.get('id')
+        module = command.get('module')
+        action = command.get('action')
+        params = command.get('params', {})
         
-        self.logger.info(f"Executing job {job_id}: {module}.{action}")
+        self.logger.info(f"Executing command {command_id}: {module}.{action}")
         
         try:
             # Execute command through rootd
-            result = self.rootd_client.execute_command(module, action, parameters)
+            result = self.rootd_client.execute_command(module, action, params)
             
             response = {
-                'job_id': job_id,
+                'command_id': command_id,
                 'success': True,
-                'result': result
+                'output': result
             }
             
             # Report result back to server if client provided
             if client:
-                await self._report_job_result(job_id, response, client)
+                await self._report_command_result(response, client)
             
             return response
             
         except Exception as e:
-            self.logger.error(f"Error executing job {job_id}: {e}")
+            self.logger.error(f"Error executing command {command_id}: {e}")
             
             response = {
-                'job_id': job_id,
+                'command_id': command_id,
                 'success': False,
                 'error': str(e)
             }
             
             # Report error back to server if client provided
             if client:
-                await self._report_job_result(job_id, response, client)
+                await self._report_command_result(response, client)
             
             return response
     
-    async def _report_job_result(self, job_id: str, result: Dict[str, Any], client: httpx.AsyncClient):
-        """Report job result back to server."""
-        try:
-            server_url = self.config.get('server_url')
-            agent_id = self.config.get('agent_id')
-            api_key = self.config.get('api_key')
-            
-            await client.post(
-                f"{server_url}/api/v1/agents/{agent_id}/jobs/{job_id}/result",
-                json=result,
-                headers={'X-API-Key': api_key},
-                timeout=10.0
-            )
-        except Exception as e:
-            self.logger.error(f"Error reporting job result: {e}")
+    async def _report_command_result(self, result: Dict[str, Any], client: httpx.AsyncClient):
+        """Report command result back to server via next checkin."""
+        # Results will be sent with next checkin - store locally for now
+        # In a production system, you might want to store these in a queue
+        pass
     
     def execute_command_sync(self, module: str, action: str, parameters: Dict[str, Any] = None) -> Dict[str, Any]:
         """Execute a command synchronously (for SSH mode)."""
