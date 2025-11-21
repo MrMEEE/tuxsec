@@ -8800,3 +8800,7 @@ INFO 2025-11-21 07:46:05,571 autoreload 430481 128814515605824 /home/mj/Ansible/
 INFO 2025-11-21 07:46:05,910 autoreload 430776 132795535151424 Watching for file changes with StatReloader
 INFO 2025-11-21 07:46:18,304 autoreload 430776 132795535151424 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
 INFO 2025-11-21 07:46:18,628 autoreload 430815 135027233026368 Watching for file changes with StatReloader
+INFO 2025-11-21 09:55:24,471 autoreload 430815 135027233026368 /home/mj/Ansible/tuxsec/web_ui/agents/models.py changed, reloading.
+INFO 2025-11-21 09:55:24,797 autoreload 446498 129996788478272 Watching for file changes with StatReloader
+INFO 2025-11-21 09:55:26,066 autoreload 446498 129996788478272 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 09:55:26,387 autoreload 446523 125448677101888 Watching for file changes with StatReloader
