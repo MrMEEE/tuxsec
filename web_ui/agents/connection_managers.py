@@ -189,7 +189,7 @@ class SSHConnectionManager(BaseConnectionManager):
                 }
             
             # Get system info
-            stdout, stderr, exit_code = self._execute_ssh_command('sudo -u tuxsec tuxsec-cli system-info')
+            stdout, stderr, exit_code = self._execute_ssh_command('tuxsec-cli system-info')
             if exit_code == 0 and stdout.strip():
                 try:
                     system_info = json.loads(stdout)
@@ -234,7 +234,8 @@ class SSHConnectionManager(BaseConnectionManager):
             command = command.replace('-', '_')
             
             # Build tuxsec-cli command
-            cmd_parts = ['sudo', '-u', 'tuxsec', 'tuxsec-cli', 'execute', module, command]
+            # Note: No sudo needed - SSH connection is already as tuxsec user
+            cmd_parts = ['tuxsec-cli', 'execute', module, command]
             
             # Add parameters
             if parameters:
