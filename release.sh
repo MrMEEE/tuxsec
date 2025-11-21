@@ -34,10 +34,11 @@ print_error() {
 # Validate bump type
 if [[ ! "$BUMP_TYPE" =~ ^(major|minor|patch)$ ]]; then
     print_error "Invalid bump type: $BUMP_TYPE"
-    echo "Usage: $0 [major|minor|patch]"
+    echo "Usage: $0 [major|minor|patch] [--auto]"
     echo "  major - Increment major version (X.0.0)"
     echo "  minor - Increment minor version (0.X.0)"
     echo "  patch - Increment patch version (0.0.X) [default]"
+    echo "  --auto - Skip manual CHANGELOG edit prompt and push confirmation"
     exit 1
 fi
 
@@ -88,12 +89,25 @@ esac
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 print_info "New version: $NEW_VERSION"
 
+# Check if --auto flag was passed (need to check early for initial confirmation)
+AUTO_MODE=false
+for arg in "$@"; do
+    if [[ "$arg" == "--auto" ]]; then
+        AUTO_MODE=true
+        break
+    fi
+done
+
 # Confirm with user
-read -p "Proceed with release $NEW_VERSION? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    print_error "Aborted by user"
-    exit 1
+if [ "$AUTO_MODE" = false ]; then
+    read -p "Proceed with release $NEW_VERSION? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        print_error "Aborted by user"
+        exit 1
+    fi
+else
+    print_info "Auto mode: Proceeding with release $NEW_VERSION"
 fi
 
 echo
@@ -212,8 +226,12 @@ fi
 
 rm -f /tmp/changelog_entry.md
 
-print_warning "Please edit CHANGELOG.md to add release notes for version $NEW_VERSION"
-read -p "Press Enter when you've updated the CHANGELOG..."
+if [ "$AUTO_MODE" = false ]; then
+    print_warning "Please edit CHANGELOG.md to add release notes for version $NEW_VERSION"
+    read -p "Press Enter when you've updated the CHANGELOG..."
+else
+    print_info "Auto mode: Skipping CHANGELOG manual edit prompt"
+fi
 
 # Step 6: Git operations
 print_info "Staging changes..."
@@ -234,9 +252,9 @@ print_success "Created tag v$NEW_VERSION"
 
 # Step 7: Push to remote
 print_info "Pushing to remote repository..."
-read -p "Push changes and tag to origin? (y/N) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+
+if [ "$AUTO_MODE" = true ]; then
+    print_info "Auto mode: Automatically pushing changes and tag"
     git push origin main
     print_success "Pushed changes to main branch"
     
@@ -250,10 +268,27 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     print_info "Check the progress at: https://github.com/MrMEEE/tuxsec/actions"
     echo
 else
-    print_warning "Changes and tag not pushed to remote"
-    print_info "You can push manually with:"
-    echo "  git push origin main"
-    echo "  git push origin v$NEW_VERSION"
+    read -p "Push changes and tag to origin? (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        git push origin main
+        print_success "Pushed changes to main branch"
+        
+        git push origin "v$NEW_VERSION"
+        print_success "Pushed tag v$NEW_VERSION"
+        
+        echo
+        print_success "Release $NEW_VERSION completed successfully!"
+        echo
+        print_info "GitHub Actions will now build RPMs for RHEL 9 and RHEL 10"
+        print_info "Check the progress at: https://github.com/MrMEEE/tuxsec/actions"
+        echo
+    else
+        print_warning "Changes and tag not pushed to remote"
+        print_info "You can push manually with:"
+        echo "  git push origin main"
+        echo "  git push origin v$NEW_VERSION"
+    fi
 fi
 
 # Step 8: Summary
