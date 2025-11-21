@@ -16,9 +16,9 @@ BuildRequires:  systemd-rpm-macros
 BuildRequires:  selinux-policy-devel
 
 Requires:       python3 >= 3.8
-Requires:       python3-pyyaml >= 6.0
-Requires:       python3-httpx >= 0.24
-Requires:       python3-aiohttp >= 3.8
+Requires:       python3-pyyaml >= 5.0
+Requires:       python3-httpx >= 0.20
+Requires:       python3-aiohttp >= 3.7
 Requires:       systemd
 Requires(pre):  shadow-utils
 Requires(post): systemd
