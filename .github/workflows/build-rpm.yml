@@ -175,37 +175,61 @@ jobs:
         run: |
           mkdir -p release-files
           
-          # RHEL 9
-          mv release/rhel9/build/rpmbuild/RPMS/noarch/*.rpm release-files/ 2>/dev/null || true
-          mv release/rhel9/build/rpmbuild/SRPMS/*.rpm release-files/ 2>/dev/null || true
+          # Debug: show what we have
+          echo "=== Downloaded artifacts structure ==="
+          find release -type f
+          echo "======================================"
+          
+          # RHEL 9 - handle both possible structures
+          if [ -d "release/rhel9/build/rpmbuild/RPMS/noarch" ]; then
+            cp release/rhel9/build/rpmbuild/RPMS/noarch/*.rpm release-files/ 2>/dev/null || true
+          fi
+          if [ -d "release/rhel9/build/rpmbuild/SRPMS" ]; then
+            cp release/rhel9/build/rpmbuild/SRPMS/*.rpm release-files/ 2>/dev/null || true
+          fi
           if [ -f release/rhel9/tuxsec.pp ]; then
-            mv release/rhel9/tuxsec.pp release-files/tuxsec-rhel9.pp
+            cp release/rhel9/tuxsec.pp release-files/tuxsec-rhel9.pp
           fi
           
-          # RHEL 10
-          for rpm in release/rhel10/build/rpmbuild/RPMS/noarch/*.rpm; do
-            if [ -f "$rpm" ]; then
-              base=$(basename "$rpm")
-              mv "$rpm" "release-files/${base%.rpm}.el10.rpm"
-            fi
-          done
-          for rpm in release/rhel10/build/rpmbuild/SRPMS/*.rpm; do
-            if [ -f "$rpm" ]; then
-              base=$(basename "$rpm")
-              mv "$rpm" "release-files/${base%.src.rpm}.el10.src.rpm"
-            fi
-          done
+          # RHEL 10 - rename to include .el10
+          if [ -d "release/rhel10/build/rpmbuild/RPMS/noarch" ]; then
+            for rpm in release/rhel10/build/rpmbuild/RPMS/noarch/*.rpm; do
+              if [ -f "$rpm" ]; then
+                base=$(basename "$rpm")
+                # Insert .el10 before .noarch.rpm
+                newname=$(echo "$base" | sed 's/\.noarch\.rpm$/.el10.noarch.rpm/')
+                cp "$rpm" "release-files/$newname"
+              fi
+            done
+          fi
+          if [ -d "release/rhel10/build/rpmbuild/SRPMS" ]; then
+            for rpm in release/rhel10/build/rpmbuild/SRPMS/*.rpm; do
+              if [ -f "$rpm" ]; then
+                base=$(basename "$rpm")
+                # Insert .el10 before .src.rpm
+                newname=$(echo "$base" | sed 's/\.src\.rpm$/.el10.src.rpm/')
+                cp "$rpm" "release-files/$newname"
+              fi
+            done
+          fi
           if [ -f release/rhel10/tuxsec.pp ]; then
-            mv release/rhel10/tuxsec.pp release-files/tuxsec-rhel10.pp
+            cp release/rhel10/tuxsec.pp release-files/tuxsec-rhel10.pp
           fi
           
+          echo "=== Release files ==="
           ls -lh release-files/
+          echo "====================="
 
       - name: Generate checksums
         run: |
           cd release-files
-          sha256sum *.rpm *.pp > SHA256SUMS
-          cat SHA256SUMS
+          if ls *.rpm >/dev/null 2>&1 || ls *.pp >/dev/null 2>&1; then
+            sha256sum *.rpm *.pp 2>/dev/null > SHA256SUMS || true
+            cat SHA256SUMS
+          else
+            echo "ERROR: No files found to checksum!"
+            exit 1
+          fi
 
       - name: Create release notes
         run: |
