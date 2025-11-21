@@ -1,0 +1,119 @@
+policy_module(tuxsec, 1.0.0)
+
+########################################
+# Declarations
+########################################
+
+# Type for the root daemon
+type tuxsec_rootd_t;
+type tuxsec_rootd_exec_t;
+init_daemon_domain(tuxsec_rootd_t, tuxsec_rootd_exec_t)
+
+# Type for the userspace agent
+type tuxsec_agent_t;
+type tuxsec_agent_exec_t;
+init_daemon_domain(tuxsec_agent_t, tuxsec_agent_exec_t)
+
+# Type for the Unix socket
+type tuxsec_var_run_t;
+files_pid_file(tuxsec_var_run_t)
+
+# Type for log files
+type tuxsec_log_t;
+logging_log_file(tuxsec_log_t)
+
+# Type for configuration files
+type tuxsec_etc_t;
+files_config_file(tuxsec_etc_t)
+
+# Type for data files
+type tuxsec_var_lib_t;
+files_type(tuxsec_var_lib_t)
+
+# Port type for push mode
+type tuxsec_port_t;
+corenet_port(tuxsec_port_t)
+
+########################################
+# Root daemon policy
+########################################
+
+# Allow root daemon to create and manage Unix socket
+allow tuxsec_rootd_t tuxsec_var_run_t:dir manage_dir_perms;
+allow tuxsec_rootd_t tuxsec_var_run_t:sock_file manage_sock_file_perms;
+allow tuxsec_rootd_t tuxsec_var_run_t:file manage_file_perms;
+files_pid_filetrans(tuxsec_rootd_t, tuxsec_var_run_t, { dir file sock_file })
+
+# Allow root daemon to write logs
+allow tuxsec_rootd_t tuxsec_log_t:dir manage_dir_perms;
+allow tuxsec_rootd_t tuxsec_log_t:file { create_file_perms append_file_perms };
+logging_log_filetrans(tuxsec_rootd_t, tuxsec_log_t, { dir file })
+
+# Allow root daemon to read configuration
+allow tuxsec_rootd_t tuxsec_etc_t:dir list_dir_perms;
+allow tuxsec_rootd_t tuxsec_etc_t:file read_file_perms;
+
+# Allow root daemon to execute firewalld commands
+firewalld_dbus_chat(tuxsec_rootd_t)
+firewalld_read_config(tuxsec_rootd_t)
+
+# Allow root daemon to use systemctl
+systemd_exec_systemctl(tuxsec_rootd_t)
+
+# Allow root daemon to read system info
+kernel_read_system_state(tuxsec_rootd_t)
+kernel_read_network_state(tuxsec_rootd_t)
+
+# Allow root daemon to execute commands
+corecmd_exec_bin(tuxsec_rootd_t)
+corecmd_exec_shell(tuxsec_rootd_t)
+
+########################################
+# Userspace agent policy
+########################################
+
+# Allow userspace agent to connect to Unix socket
+allow tuxsec_agent_t tuxsec_var_run_t:dir search_dir_perms;
+allow tuxsec_agent_t tuxsec_var_run_t:sock_file write;
+allow tuxsec_agent_t tuxsec_rootd_t:unix_stream_socket connectto;
+
+# Allow userspace agent to write logs
+allow tuxsec_agent_t tuxsec_log_t:dir manage_dir_perms;
+allow tuxsec_agent_t tuxsec_log_t:file { create_file_perms append_file_perms };
+logging_log_filetrans(tuxsec_agent_t, tuxsec_log_t, { dir file })
+
+# Allow userspace agent to read configuration
+allow tuxsec_agent_t tuxsec_etc_t:dir list_dir_perms;
+allow tuxsec_agent_t tuxsec_etc_t:file read_file_perms;
+
+# Allow userspace agent to access its data directory
+allow tuxsec_agent_t tuxsec_var_lib_t:dir manage_dir_perms;
+allow tuxsec_agent_t tuxsec_var_lib_t:file manage_file_perms;
+files_var_lib_filetrans(tuxsec_agent_t, tuxsec_var_lib_t, { dir file })
+
+# Allow userspace agent to make HTTPS connections (pull/push mode)
+corenet_tcp_connect_http_port(tuxsec_agent_t)
+corenet_tcp_connect_http_cache_port(tuxsec_agent_t)
+corenet_tcp_sendrecv_generic_if(tuxsec_agent_t)
+corenet_tcp_sendrecv_generic_node(tuxsec_agent_t)
+
+# Allow userspace agent to bind to port 8443 (push mode)
+allow tuxsec_agent_t tuxsec_port_t:tcp_socket { listen accept };
+corenet_tcp_bind_generic_node(tuxsec_agent_t)
+
+# Allow userspace agent to read certificates
+miscfiles_read_generic_certs(tuxsec_agent_t)
+
+# Allow userspace agent to resolve DNS
+sysnet_read_config(tuxsec_agent_t)
+
+# Allow userspace agent to use network
+allow tuxsec_agent_t self:tcp_socket create_stream_socket_perms;
+allow tuxsec_agent_t self:udp_socket create_socket_perms;
+allow tuxsec_agent_t self:unix_stream_socket create_stream_socket_perms;
+
+########################################
+# File contexts
+########################################
+
+# These will be in the .fc file

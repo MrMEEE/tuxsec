@@ -1,0 +1,23 @@
+# TuxSec SELinux File Contexts
+
+# Executables
+/usr/bin/tuxsec-rootd             -- gen_context(system_u:object_r:tuxsec_rootd_exec_t,s0)
+/usr/bin/tuxsec-agent             -- gen_context(system_u:object_r:tuxsec_agent_exec_t,s0)
+/usr/bin/tuxsec-cli               -- gen_context(system_u:object_r:tuxsec_agent_exec_t,s0)
+/usr/bin/tuxsec-setup             -- gen_context(system_u:object_r:tuxsec_agent_exec_t,s0)
+
+# Python modules
+/usr/lib/python[^/]+/site-packages/agent/rootd/.*\.py  -- gen_context(system_u:object_r:tuxsec_rootd_exec_t,s0)
+/usr/lib/python[^/]+/site-packages/agent/userspace/.*\.py  -- gen_context(system_u:object_r:tuxsec_agent_exec_t,s0)
+
+# Runtime files
+/var/run/tuxsec(/.*)?                gen_context(system_u:object_r:tuxsec_var_run_t,s0)
+
+# Log files
+/var/log/tuxsec(/.*)?                gen_context(system_u:object_r:tuxsec_log_t,s0)
+
+# Configuration files
+/etc/tuxsec(/.*)?                    gen_context(system_u:object_r:tuxsec_etc_t,s0)
+
+# Data files
+/var/lib/tuxsec(/.*)?                gen_context(system_u:object_r:tuxsec_var_lib_t,s0)

@@ -68,10 +68,30 @@ This system provides a unified web interface and API for managing firewalld conf
 
 - **[Web UI](web_ui/)**: Django-based management interface with dynamic forms
 - **[API Server](api_server/)**: FastAPI REST API for programmatic access
-- **[Agent v2.0](tuxsec_agent/)**: **NEW** Two-component secure agent with module system
-- **[Legacy Agents](agent/)**: Original agent implementations (deprecated)
+- **[Agent v2.0](agent/)**: **NEW** Two-component secure agent with module system
 - **[Shared](shared/)**: Common models, utilities, and configuration
 - **[Module System](MODULE_SYSTEM.md)**: Plugin-based architecture for security modules
+
+## 🎁 Agent Packages
+
+The TuxSec agent is available as RPM packages:
+
+- **tuxsec-agent** - Base package (root daemon, userspace agent, CLI, setup tool)
+- **tuxsec-agent-firewalld** - Firewall management module
+- **tuxsec-agent-selinux** - SELinux policy module
+
+**Build RPMs:**
+```bash
+make rpm
+```
+
+**Install:**
+```bash
+sudo dnf install build/rpmbuild/RPMS/noarch/tuxsec-agent-*.rpm
+sudo tuxsec-setup  # Interactive configuration wizard
+```
+
+**See [PACKAGING.md](PACKAGING.md) for complete build and installation instructions.**
 
 ## Features
 

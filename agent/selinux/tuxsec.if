@@ -1,0 +1,143 @@
+# TuxSec SELinux Interface
+
+## <summary>TuxSec Agent System</summary>
+
+########################################
+## <summary>
+##	Execute tuxsec-rootd in the tuxsec_rootd domain.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed to transition.
+##	</summary>
+## </param>
+#
+interface(`tuxsec_domtrans_rootd',`
+	gen_require(`
+		type tuxsec_rootd_t, tuxsec_rootd_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	domtrans_pattern($1, tuxsec_rootd_exec_t, tuxsec_rootd_t)
+')
+
+########################################
+## <summary>
+##	Execute tuxsec-agent in the tuxsec_agent domain.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed to transition.
+##	</summary>
+## </param>
+#
+interface(`tuxsec_domtrans_agent',`
+	gen_require(`
+		type tuxsec_agent_t, tuxsec_agent_exec_t;
+	')
+
+	corecmd_search_bin($1)
+	domtrans_pattern($1, tuxsec_agent_exec_t, tuxsec_agent_t)
+')
+
+########################################
+## <summary>
+##	Connect to tuxsec-rootd over a unix stream socket.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed to connect.
+##	</summary>
+## </param>
+#
+interface(`tuxsec_stream_connect_rootd',`
+	gen_require(`
+		type tuxsec_rootd_t, tuxsec_var_run_t;
+	')
+
+	files_search_pids($1)
+	stream_connect_pattern($1, tuxsec_var_run_t, tuxsec_var_run_t, tuxsec_rootd_t)
+')
+
+########################################
+## <summary>
+##	Read tuxsec configuration files.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+#
+interface(`tuxsec_read_config',`
+	gen_require(`
+		type tuxsec_etc_t;
+	')
+
+	files_search_etc($1)
+	allow $1 tuxsec_etc_t:dir list_dir_perms;
+	allow $1 tuxsec_etc_t:file read_file_perms;
+')
+
+########################################
+## <summary>
+##	Read tuxsec log files.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+#
+interface(`tuxsec_read_log',`
+	gen_require(`
+		type tuxsec_log_t;
+	')
+
+	logging_search_logs($1)
+	allow $1 tuxsec_log_t:dir list_dir_perms;
+	allow $1 tuxsec_log_t:file read_file_perms;
+')
+
+########################################
+## <summary>
+##	All of the rules required to administrate
+##	a tuxsec environment.
+## </summary>
+## <param name="domain">
+##	<summary>
+##	Domain allowed access.
+##	</summary>
+## </param>
+## <param name="role">
+##	<summary>
+##	Role allowed access.
+##	</summary>
+## </param>
+## <rolecap/>
+#
+interface(`tuxsec_admin',`
+	gen_require(`
+		type tuxsec_rootd_t, tuxsec_agent_t;
+		type tuxsec_var_run_t, tuxsec_log_t;
+		type tuxsec_etc_t, tuxsec_var_lib_t;
+	')
+
+	allow $1 tuxsec_rootd_t:process { ptrace signal_perms };
+	ps_process_pattern($1, tuxsec_rootd_t)
+
+	allow $1 tuxsec_agent_t:process { ptrace signal_perms };
+	ps_process_pattern($1, tuxsec_agent_t)
+
+	files_search_pids($1)
+	admin_pattern($1, tuxsec_var_run_t)
+
+	logging_search_logs($1)
+	admin_pattern($1, tuxsec_log_t)
+
+	files_search_etc($1)
+	admin_pattern($1, tuxsec_etc_t)
+
+	files_search_var_lib($1)
+	admin_pattern($1, tuxsec_var_lib_t)
+')

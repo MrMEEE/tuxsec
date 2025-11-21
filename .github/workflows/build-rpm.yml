@@ -1,0 +1,275 @@
+name: Build RPM Packages
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v2.0.0, v2.1.0, etc.
+
+jobs:
+  build-rhel9:
+    name: Build RPM for RHEL 9
+    runs-on: ubuntu-latest
+    container:
+      image: rockylinux:9
+    
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf install -y epel-release
+          dnf install -y rpm-build python3-devel python3-pip git make selinux-policy-devel \
+            systemd firewalld
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Update version in spec file
+        run: |
+          sed -i "s/^Version:.*/Version:        ${{ steps.version.outputs.version }}/" tuxsec-agent.spec
+
+      - name: Build RPMs
+        run: |
+          make rpm
+
+      - name: Build SELinux policy
+        run: |
+          make selinux
+
+      - name: List built packages
+        run: |
+          ls -lh build/rpmbuild/RPMS/noarch/
+          ls -lh agent/selinux/*.pp
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms-rhel9
+          path: |
+            build/rpmbuild/RPMS/noarch/*.rpm
+            build/rpmbuild/SRPMS/*.rpm
+          retention-days: 90
+
+      - name: Upload SELinux policy
+        uses: actions/upload-artifact@v4
+        with:
+          name: selinux-policy-rhel9
+          path: agent/selinux/tuxsec.pp
+          retention-days: 90
+
+  build-rhel10:
+    name: Build RPM for RHEL 10
+    runs-on: ubuntu-latest
+    container:
+      image: quay.io/centos/centos:stream10-development
+    
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf install -y epel-release || true
+          dnf install -y rpm-build python3-devel python3-pip git make selinux-policy-devel \
+            systemd firewalld
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Update version in spec file
+        run: |
+          sed -i "s/^Version:.*/Version:        ${{ steps.version.outputs.version }}/" tuxsec-agent.spec
+
+      - name: Build RPMs
+        run: |
+          make rpm
+
+      - name: Build SELinux policy
+        run: |
+          make selinux
+
+      - name: List built packages
+        run: |
+          ls -lh build/rpmbuild/RPMS/noarch/
+          ls -lh agent/selinux/*.pp
+
+      - name: Upload RPM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpms-rhel10
+          path: |
+            build/rpmbuild/RPMS/noarch/*.rpm
+            build/rpmbuild/SRPMS/*.rpm
+          retention-days: 90
+
+      - name: Upload SELinux policy
+        uses: actions/upload-artifact@v4
+        with:
+          name: selinux-policy-rhel10
+          path: agent/selinux/tuxsec.pp
+          retention-days: 90
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-rhel9, build-rhel10]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: |
+          VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\/v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download RHEL 9 RPMs
+        uses: actions/download-artifact@v4
+        with:
+          name: rpms-rhel9
+          path: ./release/rhel9
+
+      - name: Download RHEL 9 SELinux policy
+        uses: actions/download-artifact@v4
+        with:
+          name: selinux-policy-rhel9
+          path: ./release/rhel9
+
+      - name: Download RHEL 10 RPMs
+        uses: actions/download-artifact@v4
+        with:
+          name: rpms-rhel10
+          path: ./release/rhel10
+
+      - name: Download RHEL 10 SELinux policy
+        uses: actions/download-artifact@v4
+        with:
+          name: selinux-policy-rhel10
+          path: ./release/rhel10
+
+      - name: Organize release files
+        run: |
+          mkdir -p release-files
+          
+          # RHEL 9
+          mv release/rhel9/build/rpmbuild/RPMS/noarch/*.rpm release-files/ 2>/dev/null || true
+          mv release/rhel9/build/rpmbuild/SRPMS/*.rpm release-files/ 2>/dev/null || true
+          if [ -f release/rhel9/tuxsec.pp ]; then
+            mv release/rhel9/tuxsec.pp release-files/tuxsec-rhel9.pp
+          fi
+          
+          # RHEL 10
+          for rpm in release/rhel10/build/rpmbuild/RPMS/noarch/*.rpm; do
+            if [ -f "$rpm" ]; then
+              base=$(basename "$rpm")
+              mv "$rpm" "release-files/${base%.rpm}.el10.rpm"
+            fi
+          done
+          for rpm in release/rhel10/build/rpmbuild/SRPMS/*.rpm; do
+            if [ -f "$rpm" ]; then
+              base=$(basename "$rpm")
+              mv "$rpm" "release-files/${base%.src.rpm}.el10.src.rpm"
+            fi
+          done
+          if [ -f release/rhel10/tuxsec.pp ]; then
+            mv release/rhel10/tuxsec.pp release-files/tuxsec-rhel10.pp
+          fi
+          
+          ls -lh release-files/
+
+      - name: Generate checksums
+        run: |
+          cd release-files
+          sha256sum *.rpm *.pp > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Create release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          # TuxSec Agent ${{ steps.version.outputs.version }}
+
+          ## Installation
+
+          ### RHEL 9 / Rocky Linux 9 / AlmaLinux 9
+          ```bash
+          # Download RPMs
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/tuxsec-agent-${{ steps.version.outputs.version }}-1.el9.noarch.rpm
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/tuxsec-agent-firewalld-${{ steps.version.outputs.version }}-1.el9.noarch.rpm
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/tuxsec-agent-selinux-${{ steps.version.outputs.version }}-1.el9.noarch.rpm
+
+          # Install
+          sudo dnf install tuxsec-agent-*.el9.noarch.rpm
+
+          # Configure
+          sudo tuxsec-setup
+          ```
+
+          ### RHEL 10 / Rocky Linux 10 / AlmaLinux 10
+          ```bash
+          # Download RPMs
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/tuxsec-agent-${{ steps.version.outputs.version }}-1.el10.noarch.rpm
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/tuxsec-agent-firewalld-${{ steps.version.outputs.version }}-1.el10.noarch.rpm
+          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/tuxsec-agent-selinux-${{ steps.version.outputs.version }}-1.el10.noarch.rpm
+
+          # Install
+          sudo dnf install tuxsec-agent-*.el10.noarch.rpm
+
+          # Configure
+          sudo tuxsec-setup
+          ```
+
+          ## Packages
+
+          - **tuxsec-agent** - Base package (daemon, agent, CLI, setup wizard)
+          - **tuxsec-agent-firewalld** - Firewall management module
+          - **tuxsec-agent-selinux** - SELinux policy module
+
+          ## What's New
+
+          See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/CHANGELOG.md) for detailed changes.
+
+          ## Documentation
+
+          - [README](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/README.md)
+          - [Agent Documentation](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/agent/README.md)
+          - [Architecture](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/agent/ARCHITECTURE.md)
+          - [Packaging Guide](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/PACKAGING.md)
+          - [Quick Reference](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/QUICKREF.md)
+
+          ## Verification
+
+          All packages include SHA256 checksums in the `SHA256SUMS` file.
+
+          ```bash
+          # Verify checksums
+          sha256sum -c SHA256SUMS
+          ```
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.version.outputs.version }}
+          body_path: release-notes.md
+          files: |
+            release-files/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
