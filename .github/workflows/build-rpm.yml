@@ -49,8 +49,12 @@ jobs:
 
       - name: List built packages
         run: |
-          ls -lh build/rpmbuild/RPMS/noarch/
-          ls -lh agent/selinux/*.pp
+          echo "=== noarch packages ==="
+          ls -lh build/rpmbuild/RPMS/noarch/ || echo "No noarch packages"
+          echo "=== x86_64 packages ==="
+          ls -lh build/rpmbuild/RPMS/x86_64/ || echo "No x86_64 packages"
+          echo "=== Source packages ==="
+          ls -lh build/rpmbuild/SRPMS/ || echo "No source packages"
 
       - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
@@ -58,6 +62,7 @@ jobs:
           name: rpms-rhel9
           path: |
             build/rpmbuild/RPMS/noarch/*.rpm
+            build/rpmbuild/RPMS/x86_64/*.rpm
             build/rpmbuild/SRPMS/*.rpm
           retention-days: 90
 
@@ -104,8 +109,12 @@ jobs:
 
       - name: List built packages
         run: |
-          ls -lh build/rpmbuild/RPMS/noarch/
-          ls -lh agent/selinux/*.pp
+          echo "=== noarch packages ==="
+          ls -lh build/rpmbuild/RPMS/noarch/ || echo "No noarch packages"
+          echo "=== x86_64 packages ==="
+          ls -lh build/rpmbuild/RPMS/x86_64/ || echo "No x86_64 packages"
+          echo "=== Source packages ==="
+          ls -lh build/rpmbuild/SRPMS/ || echo "No source packages"
 
       - name: Upload RPM artifacts
         uses: actions/upload-artifact@v4
@@ -113,6 +122,7 @@ jobs:
           name: rpms-rhel10
           path: |
             build/rpmbuild/RPMS/noarch/*.rpm
+            build/rpmbuild/RPMS/x86_64/*.rpm
             build/rpmbuild/SRPMS/*.rpm
           retention-days: 90
 
@@ -174,6 +184,9 @@ jobs:
             elif [[ "$base" == *.noarch.rpm ]]; then
               # Insert .el10 before .noarch.rpm
               newname=$(echo "$base" | sed 's/\.noarch\.rpm$/.el10.noarch.rpm/')
+            elif [[ "$base" == *.x86_64.rpm ]]; then
+              # Insert .el10 before .x86_64.rpm
+              newname=$(echo "$base" | sed 's/\.x86_64\.rpm$/.el10.x86_64.rpm/')
             elif [[ "$base" == *.src.rpm ]]; then
               # Insert .el10 before .src.rpm
               newname=$(echo "$base" | sed 's/\.src\.rpm$/.el10.src.rpm/')
