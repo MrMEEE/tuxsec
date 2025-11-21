@@ -41,9 +41,9 @@ setup(
     ],
     python_requires=">=3.8",
     install_requires=[
-        "PyYAML>=6.0",
-        "httpx>=0.24",
-        "aiohttp>=3.8",
+        "PyYAML>=5.0",
+        "httpx>=0.20",
+        "aiohttp>=3.7",
     ],
     extras_require={
         "dev": [
