@@ -1756,8 +1756,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // - SSH mode: Server initiates SSH connection to agent at sync interval
     // - Pull mode: Agent polls server at sync interval  
     // - Push mode: Server pushes to agent at sync interval
-    // Frontend only displays current data - no auto-polling to reduce load
-    // Use "Test Connection" or "Sync Firewall" buttons for manual updates
+    // Frontend polls for data changes every 5 seconds and updates display when changed
+    
+    // Start polling for updates
+    setInterval(checkForUpdates, 5000);
+    setTimeout(checkForUpdates, 1000);
 });
 </script>
 {% endblock %}
