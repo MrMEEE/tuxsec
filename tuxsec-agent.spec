@@ -253,12 +253,12 @@ fi
 %files -n tuxsec-agent
 %license LICENSE
 %doc README.md
-%doc agent/README.md
 %doc agent/ARCHITECTURE.md
 %doc agent/MIGRATION.md
 
 # Python package
 %{python3_sitelib}/agent/
+%{python3_sitelib}/shared/
 %{python3_sitelib}/tuxsec_agent-*.egg-info/
 %exclude %{python3_sitelib}/agent/rootd/modules/firewalld.py
 %exclude %{python3_sitelib}/agent/rootd/modules/__pycache__/firewalld.*
