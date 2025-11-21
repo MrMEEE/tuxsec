@@ -161,12 +161,17 @@ jobs:
             cp "$rpm" release-files/ && echo "Copied: $(basename $rpm)"
           done
           
-          # RHEL 10 RPMs - rename to include .el10
+          # RHEL 10 RPMs - rename to include .el10 if not already present
           echo "Processing RHEL 10 RPMs..."
           find release/rhel10 -name "*.rpm" -type f | while read rpm; do
             base=$(basename "$rpm")
             echo "Found: $rpm"
-            if [[ "$base" == *.noarch.rpm ]]; then
+            
+            # Check if .el10 is already in the filename
+            if [[ "$base" == *".el10."* ]]; then
+              # Already has .el10, just copy as-is
+              newname="$base"
+            elif [[ "$base" == *.noarch.rpm ]]; then
               # Insert .el10 before .noarch.rpm
               newname=$(echo "$base" | sed 's/\.noarch\.rpm$/.el10.noarch.rpm/')
             elif [[ "$base" == *.src.rpm ]]; then
@@ -190,7 +195,8 @@ jobs:
       - name: Generate checksums
         run: |
           cd release-files
-          if [ -f *.rpm ]; then
+          # Check if any RPM files exist
+          if ls *.rpm 1> /dev/null 2>&1; then
             sha256sum *.rpm > SHA256SUMS
             echo "=== Checksums ==="
             cat SHA256SUMS
