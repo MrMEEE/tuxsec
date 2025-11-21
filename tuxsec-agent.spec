@@ -7,6 +7,9 @@ License:        MIT
 URL:            https://github.com/MrMEEE/tuxsec
 Source0:        %{name}-%{version}.tar.gz
 
+# Disable debug package generation
+%global debug_package %{nil}
+
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-pip
