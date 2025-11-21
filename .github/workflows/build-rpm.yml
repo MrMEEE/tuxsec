@@ -61,13 +61,6 @@ jobs:
             build/rpmbuild/SRPMS/*.rpm
           retention-days: 90
 
-      - name: Upload SELinux policy
-        uses: actions/upload-artifact@v4
-        with:
-          name: selinux-policy-rhel9
-          path: agent/selinux/tuxsec.pp
-          retention-days: 90
-
   build-rhel10:
     name: Build RPM for RHEL 10
     runs-on: ubuntu-latest
@@ -123,13 +116,6 @@ jobs:
             build/rpmbuild/SRPMS/*.rpm
           retention-days: 90
 
-      - name: Upload SELinux policy
-        uses: actions/upload-artifact@v4
-        with:
-          name: selinux-policy-rhel10
-          path: agent/selinux/tuxsec.pp
-          retention-days: 90
-
   create-release:
     name: Create GitHub Release
     needs: [build-rhel9, build-rhel10]
@@ -153,22 +139,10 @@ jobs:
           name: rpms-rhel9
           path: ./release/rhel9
 
-      - name: Download RHEL 9 SELinux policy
-        uses: actions/download-artifact@v4
-        with:
-          name: selinux-policy-rhel9
-          path: ./release/rhel9
-
       - name: Download RHEL 10 RPMs
         uses: actions/download-artifact@v4
         with:
           name: rpms-rhel10
-          path: ./release/rhel10
-
-      - name: Download RHEL 10 SELinux policy
-        uses: actions/download-artifact@v4
-        with:
-          name: selinux-policy-rhel10
           path: ./release/rhel10
 
       - name: Organize release files
@@ -187,12 +161,6 @@ jobs:
             cp "$rpm" release-files/ && echo "Copied: $(basename $rpm)"
           done
           
-          # RHEL 9 SELinux policy
-          if [ -f release/rhel9/tuxsec.pp ]; then
-            cp release/rhel9/tuxsec.pp release-files/tuxsec-rhel9.pp
-            echo "Copied: tuxsec-rhel9.pp"
-          fi
-          
           # RHEL 10 RPMs - rename to include .el10
           echo "Processing RHEL 10 RPMs..."
           find release/rhel10 -name "*.rpm" -type f | while read rpm; do
@@ -210,12 +178,6 @@ jobs:
             cp "$rpm" "release-files/$newname" && echo "Copied: $newname"
           done
           
-          # RHEL 10 SELinux policy
-          if [ -f release/rhel10/tuxsec.pp ]; then
-            cp release/rhel10/tuxsec.pp release-files/tuxsec-rhel10.pp
-            echo "Copied: tuxsec-rhel10.pp"
-          fi
-          
           echo ""
           echo "=== Release files ==="
           ls -lh release-files/
@@ -223,19 +185,18 @@ jobs:
           echo ""
           echo "=== File count ==="
           echo "RPMs: $(find release-files -name "*.rpm" | wc -l)"
-          echo "PP files: $(find release-files -name "*.pp" | wc -l)"
           echo "=================="
 
       - name: Generate checksums
         run: |
           cd release-files
-          if [ -f *.rpm ] || [ -f *.pp ]; then
-            sha256sum * > SHA256SUMS 2>/dev/null || true
+          if [ -f *.rpm ]; then
+            sha256sum *.rpm > SHA256SUMS
             echo "=== Checksums ==="
             cat SHA256SUMS
             echo "================="
           else
-            echo "ERROR: No files found to checksum!"
+            echo "ERROR: No RPM files found to checksum!"
             echo "Files in release-files/:"
             ls -la
             exit 1
