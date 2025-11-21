@@ -48,15 +48,29 @@ if [ ! -f "tuxsec-agent.spec" ]; then
     exit 1
 fi
 
+# Check if --auto flag was passed (need to check early)
+AUTO_MODE=false
+for arg in "$@"; do
+    if [[ "$arg" == "--auto" ]]; then
+        AUTO_MODE=true
+        break
+    fi
+done
+
 # Check for uncommitted changes
 if ! git diff-index --quiet HEAD --; then
-    print_warning "You have uncommitted changes:"
-    git status --short
-    read -p "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        print_error "Aborted by user"
-        exit 1
+    if [ "$AUTO_MODE" = false ]; then
+        print_warning "You have uncommitted changes:"
+        git status --short
+        read -p "Continue anyway? (y/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            print_error "Aborted by user"
+            exit 1
+        fi
+    else
+        print_info "Auto mode: Continuing with uncommitted changes"
+        git status --short
     fi
 fi
 
@@ -88,15 +102,6 @@ esac
 
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 print_info "New version: $NEW_VERSION"
-
-# Check if --auto flag was passed (need to check early for initial confirmation)
-AUTO_MODE=false
-for arg in "$@"; do
-    if [[ "$arg" == "--auto" ]]; then
-        AUTO_MODE=true
-        break
-    fi
-done
 
 # Confirm with user
 if [ "$AUTO_MODE" = false ]; then
