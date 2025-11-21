@@ -31,6 +31,7 @@ class AgentRegistration(BaseModel):
     version: str
     mode: AgentMode = AgentMode.PULL
     pull_interval: int = 300  # seconds
+    api_key: Optional[str] = None  # API key for authentication
     certificate_request: Optional[str] = None
 
 
@@ -48,6 +49,7 @@ class AgentInfo(BaseModel):
     position_y: float = 0
     certificate_issued: bool = False
     available_modules: List[str] = Field(default_factory=list, description="Available modules on the agent")
+    api_key: Optional[str] = Field(None, description="API key (only returned on registration)")
     created_at: datetime
     updated_at: datetime
     updated_at: datetime

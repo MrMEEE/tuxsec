@@ -74,6 +74,44 @@ Commands use a module-based structure:
 - `systeminfo`: System information (hostname, OS, uptime)
 - `firewalld`: Firewall management (requires tuxsec-agent-firewalld package)
 
+### Authentication
+
+**SSH Mode:**
+- Uses SSH keys or password authentication
+- Server authenticates to agent machine via SSH
+- Commands run as tuxsec user with sudo privileges
+
+**Pull Mode (agent_to_server):**
+- Agent authenticates with X-API-Key header
+- API key generated during agent registration
+- All agent-to-server requests include: `X-API-Key: <api_key>`
+
+**Push Mode (server_to_agent):**
+- Server sends X-API-Key header to agent
+- Agent validates key against stored server key
+- Used when server initiates connection to agent
+
+**API Key Management:**
+1. **Registration**: Server generates API key during agent registration
+   ```bash
+   POST /api/agents/register
+   {
+     "hostname": "web01.example.com",
+     "ip_address": "192.168.1.100",
+     "mode": "pull"
+   }
+   # Response includes api_key (only returned once!)
+   ```
+
+2. **Storage**: Agent stores API key in `/etc/tuxsec/config.yaml`
+
+3. **Usage**: Agent includes in all API requests
+   ```bash
+   curl -H "X-API-Key: $API_KEY" https://server/api/heartbeat
+   ```
+
+4. **Rotation**: Update via re-registration with new api_key parameter
+
 ## Server Components
 
 ### 1. Django Web UI (`web_ui/`)
@@ -259,9 +297,11 @@ Server checks `agent.available_modules` before showing firewall/SELinux options 
    - Heartbeat endpoint: POST /api/heartbeat with available_modules list
    - Stored in Agent.available_modules (JSON field)
 
-4. **API Key Auth** - Implement in push/pull modes
-   - Add `X-API-Key` header validation
-   - Generate API keys during agent setup
+4. ~~**API Key Auth**~~ ✅ **DONE** - Implement in push/pull modes
+   - X-API-Key header validation via verify_agent_api_key dependency
+   - Auto-generated during agent registration (secrets.token_urlsafe(32))
+   - Secured endpoints: /api/heartbeat, /api/{agent_id}/commands, /api/{agent_id}/results
+   - Stored in Agent.api_key field (API server) and agent_api_key (Django)
 
 5. ~~**Response Parsing**~~ ✅ **DONE** - Handle new response format
    - Expect nested result structure

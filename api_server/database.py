@@ -29,6 +29,7 @@ class Agent(Base):
     operating_system = Column(String)
     firewalld_version = Column(String)
     available_modules = Column(JSON, default=list)  # List of available modules
+    api_key = Column(String)  # API key for agent authentication
     certificate_data = Column(Text)  # JSON string
     configuration = Column(JSON)  # Current configuration
     created_at = Column(DateTime, default=datetime.utcnow)
