@@ -54,11 +54,14 @@ dependencies bundled. This package is recommended for systems where
 the required Python packages are not available in the distribution
 repositories.
 
-The virtual environment is installed to /opt/tuxsec/venv and includes:
+The virtual environment is STATIC (bundled at build time) and installed 
+to /opt/tuxsec/venv. It includes:
 - PyYAML
 - httpx
 - aiohttp
-- All other required dependencies
+- All transitive dependencies
+
+No internet connection is required after installation.
 
 #######################
 # Firewalld Module
