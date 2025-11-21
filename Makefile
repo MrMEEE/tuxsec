@@ -65,7 +65,7 @@ rpm: tarball
 		$(RPMDIR)/SPECS/$(SPEC_FILE)
 	@echo ""
 	@echo "Binary RPMs created:"
-	@ls -lh $(RPMDIR)/RPMS/noarch/
+	@ls -lh $(RPMDIR)/RPMS/x86_64/ 2>/dev/null || ls -lh $(RPMDIR)/RPMS/*/
 
 selinux:
 	@echo "Building SELinux policy module..."
