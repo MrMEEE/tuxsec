@@ -63,6 +63,13 @@ class Agent(models.Model):
         help_text="List of available firewalld services on this agent"
     )
     
+    # Available modules on this agent (v0.1.0+)
+    available_modules = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of available modules (systeminfo, firewalld, selinux, aide, etc)"
+    )
+    
     class Meta:
         ordering = ['hostname']
     
@@ -187,10 +194,11 @@ class AgentConnection(models.Model):
 
 
 class AgentCommand(models.Model):
-    """Track commands sent to agents."""
+    """Track commands sent to agents with module-based structure (v0.1.0+)."""
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('sent', 'Sent'),
+        ('running', 'Running'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
         ('timeout', 'Timeout'),
@@ -198,20 +206,48 @@ class AgentCommand(models.Model):
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     agent = models.ForeignKey(Agent, on_delete=models.CASCADE, related_name='commands')
-    command_type = models.CharField(max_length=50)
-    parameters = models.JSONField(default=dict)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    result = models.JSONField(null=True, blank=True)
-    error_message = models.TextField(blank=True)
-    timeout = models.IntegerField(default=30)
     
+    # New module-based structure (v0.1.0+)
+    module = models.CharField(max_length=50, default='firewalld', blank=True, help_text="Module to execute (systeminfo, firewalld, etc)")
+    action = models.CharField(max_length=50, blank=True, help_text="Action to perform (get_status, add_service, etc)")
+    params = models.JSONField(default=dict, blank=True, help_text="Parameters for the action")
+    
+    # Legacy field for backward compatibility - stores "module.action"
+    command_type = models.CharField(max_length=100, blank=True, help_text="Legacy: stores module.action")
+    
+    # Legacy field for backward compatibility
+    parameters = models.JSONField(default=dict, blank=True, help_text="Legacy: use params instead")
+    
+    # Command execution tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    result = models.JSONField(null=True, blank=True, help_text="Command result from agent")
+    error_message = models.TextField(blank=True)
+    timeout = models.IntegerField(default=30, help_text="Timeout in seconds")
+    
+    # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     executed_at = models.DateTimeField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['agent', 'status']),
+            models.Index(fields=['module', 'action']),
+            models.Index(fields=['-created_at']),
+        ]
     
     def __str__(self):
-        return f"{self.agent.hostname} - {self.command_type} - {self.status}"
+        return f"{self.agent.hostname} - {self.module}.{self.action} - {self.status}"
+    
+    def save(self, *args, **kwargs):
+        # Auto-populate command_type for backward compatibility
+        if not self.command_type and self.module and self.action:
+            self.command_type = f"{self.module}.{self.action}"
+        
+        # Auto-populate parameters for backward compatibility
+        if not self.parameters and self.params:
+            self.parameters = self.params
+        
+        super().save(*args, **kwargs)

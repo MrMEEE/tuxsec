@@ -232,9 +232,10 @@ class SSHConnectionManager(BaseConnectionManager):
                     # Log the command
                     AgentCommand.objects.create(
                         agent=self.agent,
-                        command=f"{module}.{command}",
-                        parameters=json.dumps(parameters) if parameters else '',
-                        result=json.dumps(output),
+                        module=module,
+                        action=command,
+                        params=parameters or {},
+                        result=output,
                         status='completed' if success else 'failed'
                     )
                     
@@ -248,9 +249,10 @@ class SSHConnectionManager(BaseConnectionManager):
                     # If not JSON, treat as plain text output
                     AgentCommand.objects.create(
                         agent=self.agent,
-                        command=f"{module}.{command}",
-                        parameters=json.dumps(parameters) if parameters else '',
-                        result=stdout,
+                        module=module,
+                        action=command,
+                        params=parameters or {},
+                        result={'output': stdout},
                         status='completed'
                     )
                     return {
@@ -262,9 +264,10 @@ class SSHConnectionManager(BaseConnectionManager):
                 # Command failed
                 AgentCommand.objects.create(
                     agent=self.agent,
-                    command=f"{module}.{command}",
-                    parameters=json.dumps(parameters) if parameters else '',
-                    result=stderr,
+                    module=module,
+                    action=command,
+                    params=parameters or {},
+                    result={'error': stderr},
                     status='failed'
                 )
                 return {
@@ -346,8 +349,9 @@ class AgentToServerManager(BaseConnectionManager):
             # Create a pending command
             agent_command = AgentCommand.objects.create(
                 agent=self.agent,
-                command=f"{module}.{command}",
-                parameters=json.dumps(parameters) if parameters else '',
+                module=module,
+                action=command,
+                params=parameters or {},
                 status='pending'
             )
             
@@ -447,9 +451,10 @@ class ServerToAgentManager(BaseConnectionManager):
                 # Log the command
                 AgentCommand.objects.create(
                     agent=self.agent,
-                    command=f"{module}.{command}",
-                    parameters=json.dumps(parameters) if parameters else '',
-                    result=json.dumps(data.get('result', {})),
+                    module=module,
+                    action=command,
+                    params=parameters or {},
+                    result=data.get('result', {}),
                     status='completed' if data.get('success') else 'failed'
                 )
                 

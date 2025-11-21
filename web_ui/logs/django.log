@@ -8758,3 +8758,45 @@ Traceback (most recent call last):
 django.urls.exceptions.NoReverseMatch: Reverse for 'module_agent_toggle' with arguments '('firewalld', UUID('2fed751e-3525-479b-9f83-ee85ee1f4c08'))' not found. 1 pattern(s) tried: ['settings/modules/(?P<module_name>[^/]+)/agent/(?P<agent_id>[0-9]+)/toggle/\\Z']
 ERROR 2025-11-21 00:54:23,223 basehttp 391316 140118564271808 "GET /settings/modules/firewalld/ HTTP/1.1" 500 196107
 INFO 2025-11-21 00:54:26,421 basehttp 391316 140118564271808 "GET /settings/modules/ HTTP/1.1" 200 22539
+INFO 2025-11-21 02:27:33,782 autoreload 391316 140118757327168 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:27:34,061 autoreload 400710 131886358966592 Watching for file changes with StatReloader
+INFO 2025-11-21 02:27:56,500 autoreload 400710 131886358966592 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:27:56,790 autoreload 400752 128630090633536 Watching for file changes with StatReloader
+INFO 2025-11-21 02:28:38,423 autoreload 400752 128630090633536 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:28:38,710 autoreload 400848 130754680336704 Watching for file changes with StatReloader
+INFO 2025-11-21 02:28:52,996 autoreload 400848 130754680336704 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:28:53,290 autoreload 400887 134636739486016 Watching for file changes with StatReloader
+INFO 2025-11-21 02:29:05,648 autoreload 400887 134636739486016 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:29:05,913 autoreload 400927 131657419137344 Watching for file changes with StatReloader
+INFO 2025-11-21 02:29:20,193 autoreload 400927 131657419137344 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:29:20,460 autoreload 400979 124328163955008 Watching for file changes with StatReloader
+INFO 2025-11-21 02:29:42,810 autoreload 400979 124328163955008 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:29:43,062 autoreload 401048 123775450431808 Watching for file changes with StatReloader
+INFO 2025-11-21 02:30:27,687 autoreload 401048 123775450431808 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:30:27,958 autoreload 401110 137510387679552 Watching for file changes with StatReloader
+INFO 2025-11-21 02:30:44,389 autoreload 401110 137510387679552 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:30:44,760 autoreload 401321 127398103720256 Watching for file changes with StatReloader
+INFO 2025-11-21 02:30:59,143 autoreload 401321 127398103720256 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:30:59,606 autoreload 401359 138428945674560 Watching for file changes with StatReloader
+INFO 2025-11-21 02:31:21,130 autoreload 401359 138428945674560 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 02:31:21,420 autoreload 401502 134720682565952 Watching for file changes with StatReloader
+INFO 2025-11-21 03:12:04,629 autoreload 401502 134720682565952 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 03:12:04,911 autoreload 412547 129113538920768 Watching for file changes with StatReloader
+INFO 2025-11-21 03:12:49,590 autoreload 412547 129113538920768 /home/mj/Ansible/tuxsec/web_ui/agents/models.py changed, reloading.
+INFO 2025-11-21 03:12:49,888 autoreload 412605 135994355675456 Watching for file changes with StatReloader
+INFO 2025-11-21 03:12:59,215 autoreload 412605 135994355675456 /home/mj/Ansible/tuxsec/web_ui/agents/models.py changed, reloading.
+INFO 2025-11-21 03:12:59,484 autoreload 412644 133015126126912 Watching for file changes with StatReloader
+INFO 2025-11-21 07:44:44,124 autoreload 412644 133015126126912 /home/mj/Ansible/tuxsec/web_ui/agents/models.py changed, reloading.
+INFO 2025-11-21 07:44:44,404 autoreload 430041 131295607243072 Watching for file changes with StatReloader
+INFO 2025-11-21 07:45:12,928 autoreload 430041 131295607243072 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 07:45:13,266 autoreload 430221 133822818767168 Watching for file changes with StatReloader
+INFO 2025-11-21 07:45:27,687 autoreload 430221 133822818767168 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 07:45:28,073 autoreload 430320 135268737712448 Watching for file changes with StatReloader
+INFO 2025-11-21 07:45:41,344 autoreload 430320 135268737712448 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 07:45:41,612 autoreload 430371 136274296717632 Watching for file changes with StatReloader
+INFO 2025-11-21 07:45:52,883 autoreload 430371 136274296717632 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 07:45:53,174 autoreload 430481 128814515605824 Watching for file changes with StatReloader
+INFO 2025-11-21 07:46:05,571 autoreload 430481 128814515605824 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 07:46:05,910 autoreload 430776 132795535151424 Watching for file changes with StatReloader
+INFO 2025-11-21 07:46:18,304 autoreload 430776 132795535151424 /home/mj/Ansible/tuxsec/web_ui/agents/connection_managers.py changed, reloading.
+INFO 2025-11-21 07:46:18,628 autoreload 430815 135027233026368 Watching for file changes with StatReloader
