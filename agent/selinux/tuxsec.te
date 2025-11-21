@@ -1,105 +1,104 @@
 policy_module(tuxsec, 1.0.0)
 
 ########################################
+# Require existing types and classes
+########################################
+require {
+    type init_t;
+    type unconfined_service_t;
+    type tmp_t;
+    type var_run_t;
+    type var_log_t;
+    type etc_t;
+    type firewalld_t;
+    type http_port_t;
+    type unreserved_port_t;
+    class file { read write create unlink open getattr setattr append };
+    class dir { read write create add_name remove_name search getattr setattr };
+    class sock_file { create unlink write read getattr setattr };
+    class unix_stream_socket { connectto listen accept };
+    class tcp_socket { name_bind name_connect listen accept bind connect };
+    class capability { dac_override net_bind_service };
+    class dbus send_msg;
+}
+
+########################################
 # Declarations
 ########################################
 
 # Type for the root daemon
 type tuxsec_rootd_t;
 type tuxsec_rootd_exec_t;
-init_daemon_domain(tuxsec_rootd_t, tuxsec_rootd_exec_t)
 
-# Type for the userspace agent
+# Type for the userspace agent  
 type tuxsec_agent_t;
 type tuxsec_agent_exec_t;
-init_daemon_domain(tuxsec_agent_t, tuxsec_agent_exec_t)
 
 # Type for the Unix socket
 type tuxsec_var_run_t;
-files_pid_file(tuxsec_var_run_t)
 
 # Type for log files
 type tuxsec_log_t;
-logging_log_file(tuxsec_log_t)
 
 # Type for configuration files
 type tuxsec_etc_t;
-files_config_file(tuxsec_etc_t)
 
 # Type for data files
 type tuxsec_var_lib_t;
-files_type(tuxsec_var_lib_t)
-
-# Port type for push mode
-type tuxsec_port_t;
-corenet_port(tuxsec_port_t)
 
 ########################################
 # Root daemon policy
 ########################################
 
-# Allow root daemon to create and manage Unix socket
-allow tuxsec_rootd_t tuxsec_var_run_t:dir manage_dir_perms;
-allow tuxsec_rootd_t tuxsec_var_run_t:sock_file manage_sock_file_perms;
-allow tuxsec_rootd_t tuxsec_var_run_t:file manage_file_perms;
-files_pid_filetrans(tuxsec_rootd_t, tuxsec_var_run_t, { dir file sock_file })
+# Allow root daemon to create Unix socket in /var/run/tuxsec
+allow tuxsec_rootd_t tuxsec_var_run_t:dir { read write create add_name remove_name search };
+allow tuxsec_rootd_t tuxsec_var_run_t:sock_file { create unlink write getattr setattr };
+allow tuxsec_rootd_t tuxsec_var_run_t:unix_stream_socket { listen accept };
 
 # Allow root daemon to write logs
-allow tuxsec_rootd_t tuxsec_log_t:dir manage_dir_perms;
-allow tuxsec_rootd_t tuxsec_log_t:file { create_file_perms append_file_perms };
-logging_log_filetrans(tuxsec_rootd_t, tuxsec_log_t, { dir file })
+allow tuxsec_rootd_t tuxsec_log_t:dir { read write create add_name search };
+allow tuxsec_rootd_t tuxsec_log_t:file { read write create open append getattr };
 
 # Allow root daemon to read configuration
-allow tuxsec_rootd_t tuxsec_etc_t:dir list_dir_perms;
-allow tuxsec_rootd_t tuxsec_etc_t:file read_file_perms;
+allow tuxsec_rootd_t tuxsec_etc_t:dir { read search };
+allow tuxsec_rootd_t tuxsec_etc_t:file { read open getattr };
 
-# Allow root daemon to execute firewalld commands
-firewalld_dbus_chat(tuxsec_rootd_t)
-firewalld_read_config(tuxsec_rootd_t)
+# Allow root daemon to talk to firewalld
+allow tuxsec_rootd_t firewalld_t:dbus send_msg;
+allow firewalld_t tuxsec_rootd_t:dbus send_msg;
 
-# Allow root daemon to use systemctl
-systemd_exec_systemctl(tuxsec_rootd_t)
-
-# Allow root daemon to read system info
-kernel_read_system_state(tuxsec_rootd_t)
-kernel_read_network_state(tuxsec_rootd_t)
-
-# Allow root daemon to execute commands
-corecmd_exec_bin(tuxsec_rootd_t)
-corecmd_exec_shell(tuxsec_rootd_t)
+# Allow root daemon DAC override for privileged operations
+allow tuxsec_rootd_t self:capability dac_override;
 
 ########################################
 # Userspace agent policy
 ########################################
 
-# Allow userspace agent to connect to Unix socket
-allow tuxsec_agent_t tuxsec_var_run_t:dir search_dir_perms;
+# Allow userspace agent to connect to root daemon Unix socket
+allow tuxsec_agent_t tuxsec_var_run_t:dir search;
 allow tuxsec_agent_t tuxsec_var_run_t:sock_file write;
 allow tuxsec_agent_t tuxsec_rootd_t:unix_stream_socket connectto;
 
 # Allow userspace agent to write logs
-allow tuxsec_agent_t tuxsec_log_t:dir manage_dir_perms;
-allow tuxsec_agent_t tuxsec_log_t:file { create_file_perms append_file_perms };
-logging_log_filetrans(tuxsec_agent_t, tuxsec_log_t, { dir file })
+allow tuxsec_agent_t tuxsec_log_t:dir { read write create add_name search };
+allow tuxsec_agent_t tuxsec_log_t:file { read write create open append getattr };
 
 # Allow userspace agent to read configuration
-allow tuxsec_agent_t tuxsec_etc_t:dir list_dir_perms;
-allow tuxsec_agent_t tuxsec_etc_t:file read_file_perms;
+allow tuxsec_agent_t tuxsec_etc_t:dir { read search };
+allow tuxsec_agent_t tuxsec_etc_t:file { read open getattr };
 
 # Allow userspace agent to access its data directory
-allow tuxsec_agent_t tuxsec_var_lib_t:dir manage_dir_perms;
-allow tuxsec_agent_t tuxsec_var_lib_t:file manage_file_perms;
-files_var_lib_filetrans(tuxsec_agent_t, tuxsec_var_lib_t, { dir file })
+allow tuxsec_agent_t tuxsec_var_lib_t:dir { read write create add_name search };
+allow tuxsec_agent_t tuxsec_var_lib_t:file { read write create open getattr };
 
-# Allow userspace agent to make HTTPS connections (pull/push mode)
-corenet_tcp_connect_http_port(tuxsec_agent_t)
-corenet_tcp_connect_http_cache_port(tuxsec_agent_t)
-corenet_tcp_sendrecv_generic_if(tuxsec_agent_t)
-corenet_tcp_sendrecv_generic_node(tuxsec_agent_t)
+# Allow userspace agent to make HTTPS connections (pull mode)
+allow tuxsec_agent_t http_port_t:tcp_socket { name_connect };
+allow tuxsec_agent_t self:tcp_socket { create connect write read };
 
 # Allow userspace agent to bind to port 8443 (push mode)
-allow tuxsec_agent_t tuxsec_port_t:tcp_socket { listen accept };
-corenet_tcp_bind_generic_node(tuxsec_agent_t)
+allow tuxsec_agent_t unreserved_port_t:tcp_socket { name_bind };
+allow tuxsec_agent_t self:tcp_socket { bind listen accept };
+allow tuxsec_agent_t self:capability net_bind_service;
 
 # Allow userspace agent to read certificates
 miscfiles_read_generic_certs(tuxsec_agent_t)
