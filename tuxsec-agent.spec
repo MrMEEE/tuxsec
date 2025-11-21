@@ -10,6 +10,9 @@ Source0:        %{name}-%{version}.tar.gz
 # Disable debug package generation
 %global debug_package %{nil}
 
+# Filter out build directory dependencies from venv package
+%global __requires_exclude_from ^/opt/tuxsec/venv/.*$
+
 BuildRequires:  python3-devel
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-pip
@@ -25,8 +28,11 @@ Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
 
-# Require either system packages or venv
-Requires:       (tuxsec-agent-venv = %{version}-%{release} or (python3-pyyaml and python3-httpx and python3-aiohttp))
+# The base package works with either:
+# 1. tuxsec-agent-venv (bundled dependencies) - RECOMMENDED
+# 2. System-installed python3-pyyaml, python3-httpx, python3-aiohttp
+Recommends:     tuxsec-agent-venv = %{version}-%{release}
+BuildArch:      noarch
 
 %description
 TuxSec Agent provides secure, modular system management for Linux servers.
