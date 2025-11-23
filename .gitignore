@@ -118,3 +118,6 @@ node_modules/
 
 # DynamoDB Local files
 .dynamodb/
+
+web_ui/db.sqlite3
+web_ui/logs/django.log
