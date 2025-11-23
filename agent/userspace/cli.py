@@ -47,6 +47,16 @@ class TuxSecCLI:
             print(f"Error: {e}", file=sys.stderr)
             return 1
     
+    def installed_modules(self) -> int:
+        """List installed module packages."""
+        try:
+            modules = self.rootd.list_installed_modules()
+            print(json.dumps({"modules": modules}))
+            return 0
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+    
     def module_info(self, module: str) -> int:
         """Get information about a module."""
         try:
@@ -92,6 +102,9 @@ Examples:
     # list-modules command
     subparsers.add_parser('list-modules', help='List available modules')
     
+    # installed-modules command
+    subparsers.add_parser('installed-modules', help='List installed module packages')
+    
     # module-info command
     module_info_parser = subparsers.add_parser('module-info', help='Get module information')
     module_info_parser.add_argument('module', help='Module name')
@@ -130,6 +143,9 @@ Examples:
         
         elif args.command == 'list-modules':
             return cli.list_modules()
+        
+        elif args.command == 'installed-modules':
+            return cli.installed_modules()
         
         elif args.command == 'module-info':
             return cli.module_info(args.module)

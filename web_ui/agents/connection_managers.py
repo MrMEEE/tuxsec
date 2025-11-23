@@ -9,6 +9,7 @@ import subprocess
 from io import StringIO
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple, Any
+from asgiref.sync import sync_to_async
 from .models import Agent, AgentCommand
 
 
@@ -193,31 +194,60 @@ class SSHConnectionManager(BaseConnectionManager):
             if exit_code == 0 and stdout.strip():
                 try:
                     system_info = json.loads(stdout)
-                    if system_info.get('success'):
-                        # tuxsec-cli returns {success, data, error} format
-                        info = system_info.get('data', {})
-                        
-                        # Update agent metadata
-                        if info.get('os'):
-                            self.agent.operating_system = info['os']
-                        if info.get('version'):
-                            self.agent.version = info['version']
-                        if info.get('modules'):
-                            self.agent.available_modules = info['modules']
-                        self.agent.save(update_fields=['operating_system', 'version', 'available_modules'])
-                        
-                        return {
-                            'success': True,
-                            'connection_type': 'SSH (tuxsec-cli)',
-                            'agent_version': info.get('version', '0.1.0'),
-                            'hostname': info.get('hostname'),
-                            'operating_system': info.get('os'),
-                            'uptime': info.get('uptime'),
-                            'modules': info.get('modules', ['systeminfo']),
-                            'message': 'TuxSec agent connection successful'
-                        }
-                except json.JSONDecodeError:
-                    pass
+                    
+                    # Format OS string from distribution info
+                    os_string = "Unknown"
+                    if system_info.get('distribution'):
+                        dist = system_info['distribution']
+                        os_string = f"{dist.get('name', 'Unknown')} {dist.get('version', '')}"
+                    
+                    # Get agent version from tuxsec-agent package
+                    agent_version_cmd = 'rpm -q tuxsec-agent --qf "%{VERSION}-%{RELEASE}" 2>/dev/null || echo "unknown"'
+                    version_stdout, _, version_exit = self._execute_ssh_command(agent_version_cmd)
+                    agent_version = version_stdout.strip() if version_exit == 0 else "unknown"
+                    
+                    # Get available modules
+                    modules_stdout, _, modules_exit = self._execute_ssh_command('tuxsec-cli list-modules 2>/dev/null')
+                    available_modules = []
+                    if modules_exit == 0:
+                        # Parse module list (format: "Available modules:\n  - module1\n  - module2")
+                        for line in modules_stdout.split('\n'):
+                            line = line.strip()
+                            if line.startswith('- '):
+                                available_modules.append(line[2:])
+                    
+                    # Get installed module packages
+                    installed_stdout, _, installed_exit = self._execute_ssh_command('tuxsec-cli installed-modules 2>/dev/null')
+                    installed_modules = []
+                    if installed_exit == 0:
+                        try:
+                            installed_data = json.loads(installed_stdout)
+                            installed_modules = installed_data.get('modules', [])
+                        except json.JSONDecodeError:
+                            pass
+                    
+                    # Update agent metadata
+                    self.agent.operating_system = os_string
+                    self.agent.version = agent_version
+                    self.agent.available_modules = available_modules
+                    self.agent.installed_modules = installed_modules
+                    await sync_to_async(self.agent.save)(update_fields=['operating_system', 'version', 'available_modules', 'installed_modules'])
+                    
+                    return {
+                        'success': True,
+                        'connection_type': 'SSH (tuxsec-cli)',
+                        'agent_version': agent_version,
+                        'hostname': system_info.get('hostname'),
+                        'operating_system': os_string,
+                        'uptime': system_info.get('uptime_seconds'),
+                        'modules': available_modules,
+                        'message': 'TuxSec agent connection successful'
+                    }
+                except json.JSONDecodeError as e:
+                    return {
+                        'success': False,
+                        'error': f'Failed to parse system info JSON: {str(e)}'
+                    }
             
             return {
                 'success': True,

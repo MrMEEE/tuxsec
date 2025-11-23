@@ -70,6 +70,13 @@ class Agent(models.Model):
         help_text="List of available modules (systeminfo, firewalld, selinux, aide, etc)"
     )
     
+    # Installed module packages on this agent (v0.1.9+)
+    installed_modules = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="List of installed TuxSec module packages (RPMs)"
+    )
+    
     class Meta:
         ordering = ['hostname']
     

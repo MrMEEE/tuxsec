@@ -10,6 +10,30 @@ A comprehensive centralized management system for firewalld across multiple serv
 
 This system provides a unified web interface and API for managing firewalld configurations across multiple servers, supporting three distinct communication patterns to accommodate different network architectures and security requirements.
 
+## 🎯 Quick Start
+
+```bash
+# Clone and setup
+git clone <repository-url>
+cd tuxsec
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Initialize database
+cd web_ui && python manage.py migrate && python manage.py createsuperuser && cd ..
+
+# Start all services
+./start.sh
+
+# Access Web UI at http://127.0.0.1:8001
+```
+
+**Management Scripts:**
+- `./start.sh` - Start API Server, Web UI, and Sync Scheduler
+- `./stop.sh` - Stop all services
+- `./status.sh` - Check service status
+
 ## ⚠️ Agent Architecture v2.0
 
 **New Secure Agent Architecture!** The TuxSec agent has been completely redesigned with a two-component architecture:
@@ -139,8 +163,22 @@ python manage.py createsuperuser
 ```
 
 4. Start the services:
+
+**Option 1: Use the management scripts (recommended):**
 ```bash
-# Terminal 1: Start Redis
+# Start all services (API Server, Web UI, and Sync Scheduler)
+./start.sh
+
+# Check status of all services
+./status.sh
+
+# Stop all services
+./stop.sh
+```
+
+**Option 2: Start services manually:**
+```bash
+# Terminal 1: Start Redis (if using Redis for caching)
 redis-server
 
 # Terminal 2: Start API Server
@@ -149,11 +187,11 @@ python main.py
 
 # Terminal 3: Start Web UI
 cd web_ui
-python manage.py runserver
+python manage.py runserver 127.0.0.1:8001
 
-# Terminal 4: Start Celery (for background tasks)
+# Terminal 4: Start Sync Agents Scheduler
 cd web_ui
-celery -A tuxsec worker --loglevel=info
+python manage.py sync_agents --daemon
 ```
 
 ### Agent Installation

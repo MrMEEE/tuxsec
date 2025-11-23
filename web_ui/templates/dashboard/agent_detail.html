@@ -236,7 +236,7 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label fw-bold">Registered:</label>
-                                <div>{{ agent.created_at|date:'Y-m-d H:i:s' }}</div>
+                                <div>{{ agent.created_at|date:'d.m.Y, H:i:s' }}</div>
                             </div>
                             {% if agent.description %}
                             <div class="mb-3">
@@ -270,11 +270,20 @@
                                 <div class="d-flex justify-content-between align-items-center mb-3 pb-2 {% if not forloop.last %}border-bottom{% endif %}">
                                     <div class="flex-grow-1">
                                         <strong>{{ module.display_name }}</strong>
-                                        {% if not module.available %}
+                                        {% if not module.installed %}
+                                            <span class="badge bg-danger ms-2" title="Module package not installed on agent">
+                                                <i class="fas fa-exclamation-triangle"></i> Not Installed
+                                            </span>
+                                        {% elif not module.available %}
                                             <span class="badge bg-warning text-dark ms-2">Not Available</span>
                                         {% endif %}
                                         {% if module.error_message %}
-                                            <br><small class="text-danger">{{ module.error_message }}</small>
+                                            <br><small class="text-danger"><i class="fas fa-info-circle"></i> {{ module.error_message }}</small>
+                                        {% endif %}
+                                        {% if not module.installed %}
+                                            <br><small class="text-muted">
+                                                Install with: <code>dnf install tuxsec-agent-{{ module.name }}</code>
+                                            </small>
                                         {% endif %}
                                     </div>
                                     <div>
@@ -284,7 +293,7 @@
                                                 <input class="form-check-input" type="checkbox" role="switch" 
                                                        id="module-{{ module.name }}" 
                                                        {% if module.enabled %}checked{% endif %}
-                                                       {% if not module.available %}disabled{% endif %}
+                                                       {% if not module.available or not module.installed %}disabled{% endif %}
                                                        onchange="this.form.submit()">
                                                 <label class="form-check-label" for="module-{{ module.name }}"></label>
                                             </div>

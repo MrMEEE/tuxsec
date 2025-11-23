@@ -168,3 +168,17 @@ class RootDaemonClient:
             raise Exception(f"Command failed: {result.error}")
         
         return result.data or {}
+    
+    def list_installed_modules(self) -> list:
+        """
+        Get list of installed TuxSec module packages.
+        
+        Returns:
+            List of installed module names
+        """
+        try:
+            result = self.execute_command('systeminfo', 'list_modules', {})
+            return result.get('modules', ['systeminfo'])
+        except Exception as e:
+            # If query fails, return at least systeminfo
+            return ['systeminfo']

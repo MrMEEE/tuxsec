@@ -255,6 +255,9 @@ def agent_detail(request, agent_id):
     # Only show modules that are enabled globally
     modules_data = []
     
+    # Get agent's installed modules for comparison
+    installed_modules = agent.installed_modules or []
+    
     for module_name in registry.list_module_names():
         module = registry.get(module_name)
         if not module:
@@ -277,9 +280,17 @@ def agent_detail(request, agent_id):
             defaults={'enabled': False, 'available': True}  # Default to available since globally enabled
         )
         
-        # Ensure available is True for globally enabled modules
-        if not agent_module.available:
+        # Check if module is installed on agent
+        is_installed = module_name in installed_modules
+        
+        # Update available status based on installation
+        if not is_installed and agent_module.available:
+            agent_module.available = False
+            agent_module.error_message = f"Module package 'tuxsec-agent-{module_name}' not installed"
+            agent_module.save()
+        elif is_installed and not agent_module.available:
             agent_module.available = True
+            agent_module.error_message = None
             agent_module.save()
         
         modules_data.append({
@@ -289,6 +300,7 @@ def agent_detail(request, agent_id):
             'description': module.description,
             'enabled': agent_module.enabled,
             'available': agent_module.available,
+            'installed': is_installed,
             'error_message': agent_module.error_message,
         })
     

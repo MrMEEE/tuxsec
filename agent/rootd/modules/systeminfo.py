@@ -57,6 +57,11 @@ class SystemInfoModule(BaseModule):
                 description="Get system uptime",
                 parameters=[]
             ),
+            ModuleCapability(
+                name="list_modules",
+                description="List installed TuxSec modules",
+                parameters=[]
+            ),
         ]
     
     def initialize(self) -> tuple[bool, Optional[str]]:
@@ -87,6 +92,8 @@ class SystemInfoModule(BaseModule):
                 return self._get_kernel_version()
             elif command.action == "get_uptime":
                 return self._get_uptime()
+            elif command.action == "list_modules":
+                return self._list_modules()
             else:
                 return CommandResponse(
                     success=False,
@@ -205,3 +212,44 @@ class SystemInfoModule(BaseModule):
                 return int(uptime)
         except Exception:
             return 0
+    
+    def _list_modules(self) -> CommandResponse:
+        """List installed TuxSec modules by checking RPM packages."""
+        modules = []
+        
+        try:
+            import subprocess
+            
+            # Query RPM for tuxsec-agent-* packages
+            result = subprocess.run(
+                ['rpm', '-qa', '--qf', '%{NAME}\\n', 'tuxsec-agent-*'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                for package in result.stdout.strip().split('\n'):
+                    if package and package.startswith('tuxsec-agent-'):
+                        # Extract module name from package name
+                        # e.g., tuxsec-agent-firewalld -> firewalld
+                        module_name = package.replace('tuxsec-agent-', '')
+                        if module_name and module_name != 'agent':
+                            modules.append(module_name)
+                
+                # Always include systeminfo as it's built-in
+                if 'systeminfo' not in modules:
+                    modules.insert(0, 'systeminfo')
+            else:
+                # If RPM query fails, return at least systeminfo
+                modules = ['systeminfo']
+                
+        except Exception as e:
+            self.logger.warning(f"Could not query installed modules: {e}")
+            # Return at least systeminfo
+            modules = ['systeminfo']
+        
+        return CommandResponse(
+            success=True,
+            data={'modules': modules}
+        )
