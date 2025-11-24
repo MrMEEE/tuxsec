@@ -120,4 +120,5 @@ node_modules/
 .dynamodb/
 
 web_ui/db.sqlite3
-web_ui/logs/django.log
+web_ui/logs/
+api_server/logs/
