@@ -1,5 +1,5 @@
 Name:           tuxsec-agent
-Version:        0.1.10
+Version:        0.1.11
 Release:        1%{?dist}
 Summary:        TuxSec Agent - Secure Linux System Management
 

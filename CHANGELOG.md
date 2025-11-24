@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2025-11-24
+
+### Added
+- 
+
+### Changed
+- 
+
+### Fixed
+- 
+
+### Security
+- 
+
 ## [0.1.10] - 2025-11-24
 
 ### Added
@@ -179,7 +193,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/MrMEEE/tuxsec/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/MrMEEE/tuxsec/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/MrMEEE/tuxsec/releases/tag/v0.1.11
 [0.1.10]: https://github.com/MrMEEE/tuxsec/releases/tag/v0.1.10
 [0.1.9]: https://github.com/MrMEEE/tuxsec/releases/tag/v0.1.9
 [0.1.5]: https://github.com/MrMEEE/tuxsec/releases/tag/v0.1.5
