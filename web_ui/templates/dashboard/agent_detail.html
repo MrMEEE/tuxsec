@@ -98,6 +98,42 @@
 
 {% block content %}
 <div class="container-fluid">
+    <!-- Reload Required Banner -->
+    {% if agent.firewall_reload_required %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert" id="reloadBanner">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                <strong>Configuration Changes Pending</strong> - Firewall reload required to apply runtime changes
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn btn-sm btn-warning" onclick="reloadFirewall('reload')">
+                    <i class="fas fa-sync me-1"></i>Reload
+                </button>
+                <button type="button" class="btn btn-sm btn-warning dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown">
+                    <span class="visually-hidden">Toggle Dropdown</span>
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="reloadFirewall('reload'); return false;">
+                        <i class="fas fa-sync me-2"></i>Reload (Fast)
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="reloadFirewall('complete_reload'); return false;">
+                        <i class="fas fa-sync-alt me-2"></i>Complete Reload
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="reloadFirewall('runtime_to_permanent'); return false;">
+                        <i class="fas fa-save me-2"></i>Save to Permanent
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="checkConfig(); return false;">
+                        <i class="fas fa-check-circle me-2"></i>Check Config
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endif %}
+
     <div class="row">
         <div class="col-12">
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -280,6 +316,30 @@
                                         {% if module.error_message %}
                                             <br><small class="text-danger"><i class="fas fa-info-circle"></i> {{ module.error_message }}</small>
                                         {% endif %}
+                                        
+                                        {# Show module-specific runtime status #}
+                                        {% if module.status %}
+                                            {% if module.status.success == False %}
+                                                <br><small class="text-danger">
+                                                    <i class="fas fa-exclamation-circle"></i> <strong>Status Error:</strong> {{ module.status.error }}
+                                                </small>
+                                            {% elif module.status.running == False %}
+                                                <br><small class="text-warning">
+                                                    <i class="fas fa-stop-circle"></i> <strong>Service Not Running</strong>
+                                                    {% if module.name == 'firewalld' %}
+                                                        - Start with: <code>systemctl start firewalld</code>
+                                                    {% endif %}
+                                                </small>
+                                            {% elif module.status.running == True %}
+                                                <br><small class="text-success">
+                                                    <i class="fas fa-check-circle"></i> <strong>Service Running</strong>
+                                                    {% if module.status.default_zone %}
+                                                        (Default zone: {{ module.status.default_zone }})
+                                                    {% endif %}
+                                                </small>
+                                            {% endif %}
+                                        {% endif %}
+                                        
                                         {% if not module.installed %}
                                             <br><small class="text-muted">
                                                 Install with: <code>dnf install tuxsec-agent-{{ module.name }}</code>
@@ -306,6 +366,79 @@
                             {% endif %}
                         </div>
                     </div>
+                    
+                    <!-- Firewalld Service Control -->
+                    {% if firewalld_enabled %}
+                    <div class="info-card mt-3" id="firewalld-service-control">
+                        <div class="card-header">
+                            <h6><i class="fas fa-power-off me-2"></i>Firewalld Service Control</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-center">
+                                        <strong class="me-2">Service Status:</strong>
+                                        <span id="firewalld-status-badge" class="badge bg-secondary">
+                                            <i class="fas fa-spinner fa-spin"></i> Checking...
+                                        </span>
+                                    </div>
+                                    <small class="text-muted" id="firewalld-status-text">Loading service status...</small>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-success" id="btn-start-firewalld" onclick="controlFirewalldService('start_service')" disabled>
+                                            <i class="fas fa-play me-1"></i>Start
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-warning" id="btn-restart-firewalld" onclick="controlFirewalldService('restart_service')" disabled>
+                                            <i class="fas fa-sync me-1"></i>Restart
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-danger" id="btn-stop-firewalld" onclick="controlFirewalldService('stop_service')" disabled>
+                                            <i class="fas fa-stop me-1"></i>Stop
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-warning alert-sm mt-2 mb-0" role="alert">
+                                <i class="fas fa-exclamation-triangle me-1"></i>
+                                <strong>Warning:</strong> Stopping the firewall service will disable all firewall rules and may expose your system to security risks.
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Panic Mode Control -->
+                    <div class="info-card mt-3" id="panic-mode-control">
+                        <div class="card-header bg-danger text-white">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Emergency Panic Mode</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <div class="d-flex align-items-center">
+                                        <strong class="me-2">Panic Mode:</strong>
+                                        <span id="panic-status-badge" class="badge bg-secondary">
+                                            <i class="fas fa-spinner fa-spin"></i> Checking...
+                                        </span>
+                                    </div>
+                                    <small class="text-muted" id="panic-status-text">Loading panic mode status...</small>
+                                </div>
+                                <div class="col-md-6 text-md-end">
+                                    <div class="btn-group" role="group">
+                                        <button type="button" class="btn btn-sm btn-danger" id="btn-panic-on" onclick="controlPanicMode('panic_on')" disabled>
+                                            <i class="fas fa-ban me-1"></i>Enable Panic Mode
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-success" id="btn-panic-off" onclick="controlPanicMode('panic_off')" disabled>
+                                            <i class="fas fa-check-circle me-1"></i>Disable Panic Mode
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="alert alert-danger alert-sm mt-2 mb-0" role="alert">
+                                <i class="fas fa-skull-crossbones me-1"></i>
+                                <strong>EMERGENCY USE ONLY:</strong> Panic mode drops ALL incoming and outgoing network traffic. Enable only in case of security breach or emergency. You may lose connectivity to this system!
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Firewall Zones and Rules -->
@@ -334,7 +467,9 @@
                                     <div class="d-flex justify-content-between align-items-center mb-2">
                                         <h6 class="mb-0">
                                             <i class="fas fa-layer-group me-2 text-primary"></i>
-                                            <strong>{{ zone.name }}</strong>
+                                            <a href="{% url 'zone-detail' agent.id zone.id %}" class="text-decoration-none">
+                                                <strong>{{ zone.name }}</strong>
+                                            </a>
                                             {% if zone.target %}
                                                 <span class="badge bg-info ms-2">Target: {{ zone.target }}</span>
                                             {% endif %}
@@ -345,6 +480,12 @@
                                                     <i class="fas fa-mask me-1"></i>Masquerade
                                                 </span>
                                             {% endif %}
+                                            <a href="{% url 'zone-detail' agent.id zone.id %}" class="btn btn-sm btn-info me-1" title="View zone details">
+                                                <i class="fas fa-eye"></i>
+                                            </a>
+                                            <button class="btn btn-sm btn-primary me-1" onclick="setDefaultZone('{{ zone.name }}')" title="Set as default zone">
+                                                <i class="fas fa-star"></i>
+                                            </button>
                                             <button class="btn btn-sm btn-danger" onclick="deleteZone('{{ zone.id }}', '{{ zone.name }}')">
                                                 <i class="fas fa-trash"></i>
                                             </button>
@@ -356,41 +497,59 @@
                                     {% endif %}
                                     
                                     <div class="row g-2">
-                                        <!-- Interfaces -->
-                                        {% if zone.interfaces %}
-                                        <div class="col-md-6">
+                                        <!-- Interfaces & Sources -->
+                                        <div class="col-md-12">
                                             <div class="card bg-light border-0">
                                                 <div class="card-body p-2">
-                                                    <div class="small fw-bold mb-1">
-                                                        <i class="fas fa-network-wired me-1"></i>Interfaces
+                                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                                        <div class="small fw-bold">
+                                                            <i class="fas fa-network-wired me-1"></i>Interfaces & Sources
+                                                        </div>
+                                                        <button class="btn btn-sm btn-warning" onclick="showManageBindingsModal('{{ zone.id }}', '{{ zone.name }}')">
+                                                            <i class="fas fa-cog me-1"></i>Manage Bindings
+                                                        </button>
                                                     </div>
-                                                    <div class="small">
-                                                        {% for interface in zone.interfaces %}
-                                                            <span class="badge bg-secondary me-1">{{ interface }}</span>
-                                                        {% endfor %}
+                                                    <div class="row">
+                                                        <!-- Interfaces -->
+                                                        <div class="col-md-6">
+                                                            <div class="small fw-bold mb-1 text-muted">Interfaces:</div>
+                                                            <div class="small" id="zone-{{ zone.id }}-interfaces">
+                                                                {% if zone.interfaces %}
+                                                                    {% for interface in zone.interfaces %}
+                                                                        <span class="badge bg-secondary me-1 mb-1">
+                                                                            {{ interface }}
+                                                                            <a href="#" class="text-white ms-1" onclick="removeInterface('{{ zone.id }}', '{{ interface }}'); return false;" title="Remove interface">
+                                                                                <i class="fas fa-times"></i>
+                                                                            </a>
+                                                                        </span>
+                                                                    {% endfor %}
+                                                                {% else %}
+                                                                    <span class="text-muted">No interfaces</span>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
+                                                        <!-- Sources -->
+                                                        <div class="col-md-6">
+                                                            <div class="small fw-bold mb-1 text-muted">Sources:</div>
+                                                            <div class="small" id="zone-{{ zone.id }}-sources">
+                                                                {% if zone.sources %}
+                                                                    {% for source in zone.sources %}
+                                                                        <span class="badge bg-info me-1 mb-1">
+                                                                            {{ source }}
+                                                                            <a href="#" class="text-white ms-1" onclick="removeSource('{{ zone.id }}', '{{ source }}'); return false;" title="Remove source">
+                                                                                <i class="fas fa-times"></i>
+                                                                            </a>
+                                                                        </span>
+                                                                    {% endfor %}
+                                                                {% else %}
+                                                                    <span class="text-muted">No sources</span>
+                                                                {% endif %}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
-                                        {% endif %}
-                                        
-                                        <!-- Sources -->
-                                        {% if zone.sources %}
-                                        <div class="col-md-6">
-                                            <div class="card bg-light border-0">
-                                                <div class="card-body p-2">
-                                                    <div class="small fw-bold mb-1">
-                                                        <i class="fas fa-map-marker-alt me-1"></i>Sources
-                                                    </div>
-                                                    <div class="small">
-                                                        {% for source in zone.sources %}
-                                                            <span class="badge bg-secondary me-1">{{ source }}</span>
-                                                        {% endfor %}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {% endif %}
                                         
                                         <!-- Services -->
                                         <div class="col-md-6">
@@ -747,7 +906,7 @@
 
 <!-- Create Zone Modal -->
 <div class="modal fade" id="createZoneModal" tabindex="-1" aria-labelledby="createZoneModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="createZoneModalLabel">
@@ -758,20 +917,95 @@
             </div>
             <div class="modal-body">
                 <form id="createZoneForm">
-                    <div class="mb-3">
-                        <label for="zoneName" class="form-label">Zone Name</label>
-                        <input type="text" class="form-control" id="zoneName" placeholder="e.g., dmz, internal" required>
-                        <div class="form-text">Enter a unique zone name</div>
+                    <!-- Template Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-layer-group me-1"></i>Choose a Template (Optional)
+                        </label>
+                        <div class="row g-2">
+                            <div class="col-md-4">
+                                <div class="template-card" data-template="custom">
+                                    <i class="fas fa-cog fa-2x mb-2 text-secondary"></i>
+                                    <h6>Custom</h6>
+                                    <small class="text-muted">Create from scratch</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="template-card" data-template="dmz">
+                                    <i class="fas fa-shield-alt fa-2x mb-2 text-warning"></i>
+                                    <h6>DMZ</h6>
+                                    <small class="text-muted">Public services (SSH)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="template-card" data-template="internal">
+                                    <i class="fas fa-building fa-2x mb-2 text-info"></i>
+                                    <h6>Internal</h6>
+                                    <small class="text-muted">Trusted network</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="template-card" data-template="external">
+                                    <i class="fas fa-globe fa-2x mb-2 text-danger"></i>
+                                    <h6>External</h6>
+                                    <small class="text-muted">Untrusted network</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="template-card" data-template="trusted">
+                                    <i class="fas fa-check-circle fa-2x mb-2 text-success"></i>
+                                    <h6>Trusted</h6>
+                                    <small class="text-muted">All traffic accepted</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="template-card" data-template="drop">
+                                    <i class="fas fa-ban fa-2x mb-2 text-dark"></i>
+                                    <h6>Drop</h6>
+                                    <small class="text-muted">All traffic dropped</small>
+                                </div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="zoneTemplate" value="custom">
                     </div>
+                    
+                    <hr>
+                    
+                    <!-- Zone Configuration -->
                     <div class="mb-3">
-                        <label for="zoneTarget" class="form-label">Target</label>
+                        <label for="zoneName" class="form-label fw-bold">Zone Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="zoneName" placeholder="e.g., dmz, internal" required pattern="[a-zA-Z0-9_-]+">
+                        <div class="form-text">Only letters, numbers, hyphens, and underscores allowed</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="zoneDescription" class="form-label fw-bold">Description</label>
+                        <textarea class="form-control" id="zoneDescription" rows="2" placeholder="Optional description for this zone"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="zoneTarget" class="form-label fw-bold">Target Policy</label>
                         <select class="form-select" id="zoneTarget">
-                            <option value="default" selected>default</option>
-                            <option value="ACCEPT">ACCEPT</option>
-                            <option value="DROP">DROP</option>
-                            <option value="REJECT">REJECT</option>
+                            <option value="default" selected>default (firewalld decides)</option>
+                            <option value="ACCEPT">ACCEPT (allow all traffic)</option>
+                            <option value="DROP">DROP (silently drop all traffic)</option>
+                            <option value="%%REJECT%%">REJECT (reject all traffic with ICMP)</option>
                         </select>
-                        <div class="form-text">Default policy for the zone</div>
+                        <div class="form-text">Default policy for packets not matching any rule</div>
+                    </div>
+                    
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="zonePermanent" checked>
+                        <label class="form-check-label" for="zonePermanent">
+                            Make permanent (survive reboot)
+                        </label>
+                    </div>
+                    
+                    <!-- Template Preview -->
+                    <div id="templatePreview" class="alert alert-info d-none">
+                        <h6><i class="fas fa-info-circle me-1"></i>Template Preview</h6>
+                        <p class="mb-1"><strong>Services:</strong> <span id="previewServices"></span></p>
+                        <p class="mb-0"><strong>Target:</strong> <span id="previewTarget"></span></p>
                     </div>
                 </form>
             </div>
@@ -786,6 +1020,40 @@
         </div>
     </div>
 </div>
+
+<style>
+.template-card {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: white;
+}
+
+.template-card:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 0 10px rgba(13, 110, 253, 0.2);
+    transform: translateY(-2px);
+}
+
+.template-card.selected {
+    border-color: #0d6efd;
+    background: #e7f1ff;
+    box-shadow: 0 0 10px rgba(13, 110, 253, 0.3);
+}
+
+.template-card h6 {
+    margin: 5px 0;
+    font-weight: 600;
+}
+
+.template-card small {
+    display: block;
+    font-size: 0.75rem;
+}
+</style>
 
 <!-- Add to Zone Modal -->
 <div class="modal fade" id="addToZoneModal" tabindex="-1" aria-labelledby="addToZoneModalLabel" aria-hidden="true">
@@ -844,6 +1112,101 @@
                 </button>
                 <button type="button" class="btn btn-primary btn-action" id="addServiceSubmit">
                     <i class="fas fa-plus me-1"></i>Add Service
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Bindings Modal -->
+<div class="modal fade" id="manageBindingsModal" tabindex="-1" aria-labelledby="manageBindingsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="manageBindingsModalLabel">
+                    <i class="fas fa-cog me-2"></i>
+                    Manage Bindings for <span id="manageBindingsZoneName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs" id="bindingsTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="interfaces-tab" data-bs-toggle="tab" data-bs-target="#interfaces-pane" type="button" role="tab">
+                            <i class="fas fa-network-wired me-1"></i>Interfaces
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="sources-tab" data-bs-toggle="tab" data-bs-target="#sources-pane" type="button" role="tab">
+                            <i class="fas fa-map-marker-alt me-1"></i>Sources
+                        </button>
+                    </li>
+                </ul>
+                <div class="tab-content mt-3" id="bindingsTabContent">
+                    <!-- Interfaces Tab -->
+                    <div class="tab-pane fade show active" id="interfaces-pane" role="tabpanel">
+                        <form id="addInterfaceForm">
+                            <div class="mb-3">
+                                <label for="interfaceName" class="form-label">Network Interface</label>
+                                <select class="form-select" id="interfaceName" required>
+                                    <option value="">Select an interface...</option>
+                                    <!-- Will be populated dynamically -->
+                                </select>
+                                <div class="form-text">Choose a network interface to bind to this zone</div>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="interfacePermanent" checked>
+                                <label class="form-check-label" for="interfacePermanent">
+                                    Make permanent (survives reboot)
+                                </label>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="addInterfaceSubmit">
+                                <i class="fas fa-plus me-1"></i>Add Interface
+                            </button>
+                        </form>
+                        <hr class="my-3">
+                        <div id="currentInterfaces">
+                            <!-- Current interfaces will be listed here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Sources Tab -->
+                    <div class="tab-pane fade" id="sources-pane" role="tabpanel">
+                        <form id="addSourceForm">
+                            <div class="mb-3">
+                                <label for="sourceType" class="form-label">Source Type</label>
+                                <select class="form-select" id="sourceType" required>
+                                    <option value="ipv4" selected>IPv4 Address/CIDR</option>
+                                    <option value="ipv6">IPv6 Address/CIDR</option>
+                                    <option value="mac">MAC Address</option>
+                                    <option value="ipset">IPSet</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label for="sourceValue" class="form-label">Source Value</label>
+                                <input type="text" class="form-control" id="sourceValue" placeholder="e.g., 192.168.1.0/24" required>
+                                <div class="form-text" id="sourceHelp">Enter an IPv4 address or CIDR notation</div>
+                            </div>
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="sourcePermanent" checked>
+                                <label class="form-check-label" for="sourcePermanent">
+                                    Make permanent (survives reboot)
+                                </label>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="addSourceSubmit">
+                                <i class="fas fa-plus me-1"></i>Add Source
+                            </button>
+                        </form>
+                        <hr class="my-3">
+                        <div id="currentSources">
+                            <!-- Current sources will be listed here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-action" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Close
                 </button>
             </div>
         </div>
@@ -912,8 +1275,95 @@ async function handleResponse(response) {
 function renderZones(zones) {
     const zonesBody = document.getElementById('zones-body');
     const zonesCountBadge = document.getElementById('zones-count-badge');
+    const zonesCollapse = document.getElementById('zonesCollapse');
     
     if (!zonesBody) return;
+    
+    console.log('=== renderZones DEBUG START ===');
+    console.log('Total zones received:', zones.length);
+    console.log('Zone names:', zones.map(z => z.name).join(', '));
+    console.log('Zone IDs:', zones.map(z => z.id).join(', '));
+    
+    // **FIX FLICKERING**: Don't update if the section is collapsed
+    const isExpanded = zonesCollapse && zonesCollapse.classList.contains('show');
+    console.log('Section expanded?', isExpanded);
+    
+    if (!isExpanded) {
+        // Only update the count badge when collapsed
+        if (zonesCountBadge) {
+            zonesCountBadge.textContent = `${zones.length} zone${zones.length !== 1 ? 's' : ''}`;
+        }
+        console.log('Section collapsed - skipping DOM update');
+        console.log('=== renderZones DEBUG END ===');
+        return; // Skip DOM updates to prevent flickering
+    }
+    
+    // **FIX APPEARING/DISAPPEARING**: Create detailed signature including all data
+    // NOTE: Exclude 'id' from signature because zones are deleted/recreated during sync
+    // which changes IDs but not actual content
+    const createSignature = (zones) => {
+        return JSON.stringify(zones.map(z => ({
+            name: z.name,  // Use name as identifier instead of id
+            target: z.target || '',
+            description: z.description || '',
+            masquerade: z.masquerade || false,
+            services: (z.services_with_status || []).map(s => `${s.name}:${s.permanent}`).sort(),
+            ports: (z.ports_with_status || []).map(p => `${p.spec}:${p.permanent}`).sort(),
+            interfaces: (z.interfaces || []).sort(),
+            sources: (z.sources || []).sort()
+        })).sort((a, b) => a.name.localeCompare(b.name))); // Sort by name for consistency
+    };
+    
+    const newSignature = createSignature(zones);
+    console.log('New signature (first 300 chars):', newSignature.substring(0, 300));
+    
+    // Store last signature to compare
+    if (window.lastZonesSignature === newSignature) {
+        // Data is identical, skip update
+        console.log('Signatures MATCH - no DOM update needed');
+        console.log('=== renderZones DEBUG END ===');
+        return;
+    }
+    
+    if (window.lastZonesSignature) {
+        console.log('Signatures DIFFER - updating DOM');
+        console.log('Old signature (first 300 chars):', window.lastZonesSignature.substring(0, 300));
+        
+        // Find differences
+        const oldSig = JSON.parse(window.lastZonesSignature);
+        const newSig = JSON.parse(newSignature);
+        
+        console.log('Old zone count:', oldSig.length);
+        console.log('New zone count:', newSig.length);
+        
+        // Check each zone for differences
+        newSig.forEach((newZone, idx) => {
+            const oldZone = oldSig.find(z => z.name === newZone.name);
+            if (!oldZone) {
+                console.log(`  NEW ZONE: ${newZone.name}`);
+            } else {
+                const oldStr = JSON.stringify(oldZone);
+                const newStr = JSON.stringify(newZone);
+                if (oldStr !== newStr) {
+                    console.log(`  CHANGED ZONE: ${newZone.name}`);
+                    console.log('    Old:', oldStr);
+                    console.log('    New:', newStr);
+                }
+            }
+        });
+        
+        oldSig.forEach(oldZone => {
+            if (!newSig.find(z => z.name === oldZone.name)) {
+                console.log(`  DELETED ZONE: ${oldZone.name}`);
+            }
+        });
+    } else {
+        console.log('First render - no previous signature');
+    }
+    
+    // Data has changed, update
+    console.log('Updating DOM with', zones.length, 'zones');
+    window.lastZonesSignature = newSignature;
     
     // Update count badge
     zonesCountBadge.textContent = `${zones.length} zone${zones.length !== 1 ? 's' : ''}`;
@@ -949,57 +1399,82 @@ function renderZones(zones) {
                 ${zone.description ? `<div class="text-muted small mb-2">${zone.description}</div>` : ''}
                 
                 <div class="row g-2">
-                    ${zone.interfaces && zone.interfaces.length > 0 ? `
-                    <div class="col-md-6">
+                    <!-- Interfaces & Sources -->
+                    <div class="col-md-12">
                         <div class="card bg-light border-0">
                             <div class="card-body p-2">
-                                <div class="small fw-bold mb-1">
-                                    <i class="fas fa-network-wired me-1"></i>Interfaces
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div class="small fw-bold">
+                                        <i class="fas fa-network-wired me-1"></i>Interfaces & Sources
+                                    </div>
+                                    <button class="btn btn-sm btn-warning" onclick="showManageBindingsModal('${zone.id}', '${zone.name}')">
+                                        <i class="fas fa-cog me-1"></i>Manage Bindings
+                                    </button>
                                 </div>
-                                <div class="small">
-                                    ${zone.interfaces.map(i => `<span class="badge bg-secondary me-1">${i}</span>`).join('')}
+                                <div class="row">
+                                    <!-- Interfaces -->
+                                    <div class="col-md-6">
+                                        <div class="small fw-bold mb-1 text-muted">Interfaces:</div>
+                                        <div class="small" id="zone-${zone.id}-interfaces">
+                                            ${zone.interfaces && zone.interfaces.length > 0 ? 
+                                                zone.interfaces.map(i => `
+                                                    <span class="badge bg-secondary me-1 mb-1">
+                                                        ${i}
+                                                        <a href="#" class="text-white ms-1" onclick="removeInterface('${zone.id}', '${i}'); return false;" title="Remove interface">
+                                                            <i class="fas fa-times"></i>
+                                                        </a>
+                                                    </span>
+                                                `).join('') : 
+                                                '<span class="text-muted">No interfaces</span>'
+                                            }
+                                        </div>
+                                    </div>
+                                    <!-- Sources -->
+                                    <div class="col-md-6">
+                                        <div class="small fw-bold mb-1 text-muted">Sources:</div>
+                                        <div class="small" id="zone-${zone.id}-sources">
+                                            ${zone.sources && zone.sources.length > 0 ? 
+                                                zone.sources.map(s => `
+                                                    <span class="badge bg-info me-1 mb-1">
+                                                        ${s}
+                                                        <a href="#" class="text-white ms-1" onclick="removeSource('${zone.id}', '${s}'); return false;" title="Remove source">
+                                                            <i class="fas fa-times"></i>
+                                                        </a>
+                                                    </span>
+                                                `).join('') : 
+                                                '<span class="text-muted">No sources</span>'
+                                            }
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    ` : ''}
-                    
-                    ${zone.sources && zone.sources.length > 0 ? `
-                    <div class="col-md-6">
-                        <div class="card bg-light border-0">
-                            <div class="card-body p-2">
-                                <div class="small fw-bold mb-1">
-                                    <i class="fas fa-map-marker-alt me-1"></i>Sources
-                                </div>
-                                <div class="small">
-                                    ${zone.sources.map(s => `<span class="badge bg-secondary me-1">${s}</span>`).join('')}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    ` : ''}
                     
                     <div class="col-md-6">
                         <div class="card bg-light border-0">
                             <div class="card-body p-2">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <div class="small fw-bold">
-                                        <i class="fas fa-server me-1"></i>Services (${zone.services ? zone.services.length : 0})
+                                        <i class="fas fa-server me-1"></i>Services (${zone.services_with_status ? zone.services_with_status.length : 0})
                                     </div>
                                     <button class="btn btn-sm btn-success" onclick="showAddServiceModal('${zone.id}', '${zone.name}')">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
                                 <div class="small">
-                                    ${zone.services && zone.services.length > 0 ? 
-                                        zone.services.map(service => `
-                                            <span class="badge bg-success me-1 mb-1">
-                                                ${service}
-                                                <a href="#" class="text-white ms-1" onclick="removeService('${zone.id}', '${service}'); return false;">
+                                    ${zone.services_with_status && zone.services_with_status.length > 0 ? 
+                                        zone.services_with_status.map(item => {
+                                            const badgeColor = item.permanent ? 'success' : 'warning';
+                                            return `
+                                            <span class="badge bg-${badgeColor} me-1 mb-1">
+                                                ${item.name}
+                                                <a href="#" class="text-white ms-1" onclick="removeService('${zone.id}', '${item.name}'); return false;">
                                                     <i class="fas fa-times"></i>
                                                 </a>
                                             </span>
-                                        `).join('') : 
+                                        `;
+                                        }).join('') : 
                                         '<span class="text-muted">No services</span>'
                                     }
                                 </div>
@@ -1012,22 +1487,25 @@ function renderZones(zones) {
                             <div class="card-body p-2">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <div class="small fw-bold">
-                                        <i class="fas fa-door-open me-1"></i>Ports (${zone.ports ? zone.ports.length : 0})
+                                        <i class="fas fa-door-open me-1"></i>Ports (${zone.ports_with_status ? zone.ports_with_status.length : 0})
                                     </div>
                                     <button class="btn btn-sm btn-primary" onclick="showAddPortModal('${zone.id}', '${zone.name}')">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
                                 <div class="small">
-                                    ${zone.ports && zone.ports.length > 0 ? 
-                                        zone.ports.map(port => `
-                                            <span class="badge bg-primary me-1 mb-1">
-                                                ${port}
-                                                <a href="#" class="text-white ms-1" onclick="removePort('${zone.id}', '${port}'); return false;">
+                                    ${zone.ports_with_status && zone.ports_with_status.length > 0 ? 
+                                        zone.ports_with_status.map(item => {
+                                            const badgeColor = item.permanent ? 'primary' : 'warning';
+                                            return `
+                                            <span class="badge bg-${badgeColor} me-1 mb-1">
+                                                ${item.spec}
+                                                <a href="#" class="text-white ms-1" onclick="removePort('${zone.id}', '${item.spec}'); return false;">
                                                     <i class="fas fa-times"></i>
                                                 </a>
                                             </span>
-                                        `).join('') : 
+                                        `;
+                                        }).join('') : 
                                         '<span class="text-muted">No ports</span>'
                                     }
                                 </div>
@@ -1041,6 +1519,7 @@ function renderZones(zones) {
     });
     
     zonesBody.innerHTML = html;
+    // Note: No need to restore collapse state since we only update when expanded
 }
 
 // Poll for zone updates
@@ -1057,18 +1536,19 @@ function checkForUpdates() {
     const zonesPromise = fetch(`/agents/${agentId}/zones-data/`)
         .then(response => response.json())
         .then(data => {
-            if (data.success) {
-                // Check if data has changed
+            if (data.success && data.zones) {
+                // Always update the display with current data
+                renderZones(data.zones);
+                
+                // Update timestamp for logging
                 if (data.last_sync && data.last_sync !== lastSyncTimestamp) {
-                    console.log('Zones updated, refreshing display...');
+                    console.log('Zones data synced at:', data.last_sync);
                     lastSyncTimestamp = data.last_sync;
-                    
-                    // Update zones display
-                    renderZones(data.zones);
-                    
-                    // TODO: Update grouped rules display when implemented
                 }
             }
+        })
+        .catch(error => {
+            console.error('Error fetching zones data:', error);
         });
     
     // Poll for agent status/metadata
@@ -1150,6 +1630,80 @@ function approveAgent() {
     })
     .catch(error => {
         showError('Failed to approve agent: ' + error.message);
+    });
+}
+
+function reloadFirewall(reloadType) {
+    const agentId = '{{ agent.id }}';
+    
+    // Confirm for complete reload
+    if (reloadType === 'complete_reload') {
+        if (!confirm('Complete reload will recreate all zones, interfaces, and rules. This may cause a brief interruption. Continue?')) {
+            return;
+        }
+    }
+    
+    // Show loading indicator
+    const banner = document.getElementById('reloadBanner');
+    if (banner) {
+        banner.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin me-2"></i>Applying ' + reloadType.replace('_', ' ') + '...</div>';
+    }
+    
+    fetch(`/agents/${agentId}/firewall/reload/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reload_type: reloadType })
+    })
+    .then(handleResponse)
+    .then(data => {
+        if (data.success) {
+            showSuccess(data.message);
+            // Remove banner on success
+            if (banner) {
+                banner.remove();
+            }
+            // Refresh zone data
+            checkForUpdates();
+        } else {
+            showError('Reload failed: ' + data.error);
+            // Restore banner
+            if (banner) {
+                location.reload();
+            }
+        }
+    })
+    .catch(error => {
+        showError('Failed to reload firewall: ' + error.message);
+        if (banner) {
+            location.reload();
+        }
+    });
+}
+
+function checkConfig() {
+    const agentId = '{{ agent.id }}';
+    
+    showInfo('<i class="fas fa-spinner fa-spin me-2"></i>Checking configuration...');
+    
+    fetch(`/agents/${agentId}/firewall/check-config/`, {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+    })
+    .then(handleResponse)
+    .then(data => {
+        if (data.success && data.data && data.data.valid) {
+            showSuccess('<i class="fas fa-check-circle me-2"></i>Configuration is valid!');
+        } else {
+            showError('<strong>Configuration has errors:</strong><br>' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        showError('Failed to check configuration: ' + error.message);
     });
 }
 
@@ -1389,8 +1943,6 @@ function addService(zoneId, service) {
     .then(data => {
         if (data.success) {
             showSuccess(`Service <strong>${service}</strong> added successfully!`);
-            // Immediately refresh the zones display
-            checkForUpdates();
         } else {
             showError(`<strong>Failed to add service:</strong><br><br>${data.error || data.message}`);
         }
@@ -1415,8 +1967,6 @@ function removeService(zoneId, service) {
         .then(data => {
             if (data.success) {
                 showSuccess(`Service <strong>${service}</strong> removed successfully!`);
-                // Immediately refresh the zones display
-                checkForUpdates();
             } else {
                 showError(`<strong>Failed to remove service:</strong><br><br>${data.error || data.message}`);
             }
@@ -1460,8 +2010,6 @@ function addPort(zoneId, port, protocol) {
     .then(data => {
         if (data.success) {
             showSuccess(`Port <strong>${port}/${protocol}</strong> added successfully!`);
-            // Immediately refresh the zones display
-            checkForUpdates();
         } else {
             showError(`<strong>Failed to add port:</strong><br><br>${data.error || data.message}`);
         }
@@ -1487,8 +2035,6 @@ function removePort(zoneId, portSpec) {
         .then(data => {
             if (data.success) {
                 showSuccess(`Port <strong>${portSpec}</strong> removed successfully!`);
-                // Immediately refresh the zones display
-                checkForUpdates();
             } else {
                 showError(`<strong>Failed to remove port:</strong><br><br>${data.error || data.message}`);
             }
@@ -1499,24 +2045,311 @@ function removePort(zoneId, portSpec) {
     });
 }
 
+// Interface & Source Management Functions
+function showManageBindingsModal(zoneId, zoneName) {
+    document.getElementById('manageBindingsZoneName').textContent = zoneName;
+    const modal = new bootstrap.Modal(document.getElementById('manageBindingsModal'));
+    
+    // Store current zone info
+    window.currentBindingsZone = { id: zoneId, name: zoneName };
+    
+    // Fetch available network interfaces
+    fetchAvailableInterfaces();
+    
+    // Load current bindings
+    loadCurrentBindings(zoneId);
+    
+    // Set up event handlers
+    setupBindingsHandlers();
+    
+    // Update source help text based on type
+    document.getElementById('sourceType').addEventListener('change', function() {
+        const sourceHelp = document.getElementById('sourceHelp');
+        const sourceValue = document.getElementById('sourceValue');
+        
+        switch(this.value) {
+            case 'ipv4':
+                sourceHelp.textContent = 'Enter an IPv4 address or CIDR notation (e.g., 192.168.1.0/24)';
+                sourceValue.placeholder = 'e.g., 192.168.1.0/24';
+                break;
+            case 'ipv6':
+                sourceHelp.textContent = 'Enter an IPv6 address or CIDR notation (e.g., 2001:db8::/32)';
+                sourceValue.placeholder = 'e.g., 2001:db8::/32';
+                break;
+            case 'mac':
+                sourceHelp.textContent = 'Enter a MAC address (e.g., 00:11:22:33:44:55)';
+                sourceValue.placeholder = 'e.g., 00:11:22:33:44:55';
+                break;
+            case 'ipset':
+                sourceHelp.textContent = 'Enter an IPSet name prefixed with "ipset:"';
+                sourceValue.placeholder = 'e.g., ipset:blocklist';
+                break;
+        }
+    });
+    
+    modal.show();
+}
+
+function fetchAvailableInterfaces() {
+    const agentId = '{{ agent.id }}';
+    const interfaceSelect = document.getElementById('interfaceName');
+    
+    // For now, add common interface names - this should be fetched from agent
+    const commonInterfaces = ['eth0', 'eth1', 'ens33', 'ens192', 'eno1', 'wlan0', 'wlp2s0', 'br0', 'docker0'];
+    
+    interfaceSelect.innerHTML = '<option value="">Select an interface...</option>';
+    commonInterfaces.forEach(iface => {
+        const option = document.createElement('option');
+        option.value = iface;
+        option.textContent = iface;
+        interfaceSelect.appendChild(option);
+    });
+}
+
+function loadCurrentBindings(zoneId) {
+    // Display current interfaces
+    const interfacesDiv = document.getElementById('currentInterfaces');
+    const zoneInterfacesEl = document.getElementById(`zone-${zoneId}-interfaces`);
+    
+    if (zoneInterfacesEl) {
+        interfacesDiv.innerHTML = '<h6 class="mb-2">Current Interfaces:</h6>' + zoneInterfacesEl.innerHTML;
+    } else {
+        interfacesDiv.innerHTML = '<p class="text-muted">No interfaces bound to this zone.</p>';
+    }
+    
+    // Display current sources
+    const sourcesDiv = document.getElementById('currentSources');
+    const zoneSourcesEl = document.getElementById(`zone-${zoneId}-sources`);
+    
+    if (zoneSourcesEl) {
+        sourcesDiv.innerHTML = '<h6 class="mb-2">Current Sources:</h6>' + zoneSourcesEl.innerHTML;
+    } else {
+        sourcesDiv.innerHTML = '<p class="text-muted">No sources bound to this zone.</p>';
+    }
+}
+
+function setupBindingsHandlers() {
+    // Add interface handler
+    document.getElementById('addInterfaceSubmit').onclick = function() {
+        const interfaceName = document.getElementById('interfaceName').value;
+        const permanent = document.getElementById('interfacePermanent').checked;
+        
+        if (interfaceName && window.currentBindingsZone) {
+            addInterface(window.currentBindingsZone.id, interfaceName, permanent);
+        }
+    };
+    
+    // Add source handler
+    document.getElementById('addSourceSubmit').onclick = function() {
+        const sourceType = document.getElementById('sourceType').value;
+        let sourceValue = document.getElementById('sourceValue').value.trim();
+        const permanent = document.getElementById('sourcePermanent').checked;
+        
+        // Prefix ipset sources if needed
+        if (sourceType === 'ipset' && !sourceValue.startsWith('ipset:')) {
+            sourceValue = 'ipset:' + sourceValue;
+        }
+        
+        if (sourceValue && window.currentBindingsZone) {
+            addSource(window.currentBindingsZone.id, sourceValue, permanent);
+        }
+    };
+}
+
+function addInterface(zoneId, interfaceName, permanent = true) {
+    const agentId = '{{ agent.id }}';
+    
+    fetch(`/agents/${agentId}/zone/${zoneId}/interface/add/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            interface: interfaceName,
+            permanent: permanent
+        })
+    })
+    .then(handleResponse)
+    .then(data => {
+        if (data.success) {
+            showSuccess(`Interface <strong>${interfaceName}</strong> added successfully!`);
+            // Reload bindings in modal
+            loadCurrentBindings(zoneId);
+            // Clear form
+            document.getElementById('interfaceName').value = '';
+        } else {
+            showError(`<strong>Failed to add interface:</strong><br><br>${data.error || data.message}`);
+        }
+    })
+    .catch(error => {
+        showError(`<strong>Error adding interface:</strong><br><br>${error.message}`);
+    });
+}
+
+function removeInterface(zoneId, interfaceName) {
+    const agentId = '{{ agent.id }}';
+    
+    showConfirm(`Remove interface <strong>${interfaceName}</strong>?`, function() {
+        fetch(`/agents/${agentId}/zone/${zoneId}/interface/${encodeURIComponent(interfaceName)}/remove/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+        })
+        .then(handleResponse)
+        .then(data => {
+            if (data.success) {
+                showSuccess(`Interface <strong>${interfaceName}</strong> removed successfully!`);
+            } else {
+                showError(`<strong>Failed to remove interface:</strong><br><br>${data.error || data.message}`);
+            }
+        })
+        .catch(error => {
+            showError(`<strong>Error removing interface:</strong><br><br>${error.message}`);
+        });
+    });
+}
+
+function addSource(zoneId, source, permanent = true) {
+    const agentId = '{{ agent.id }}';
+    
+    fetch(`/agents/${agentId}/zone/${zoneId}/source/add/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+            source: source,
+            permanent: permanent
+        })
+    })
+    .then(handleResponse)
+    .then(data => {
+        if (data.success) {
+            showSuccess(`Source <strong>${source}</strong> added successfully!`);
+            // Reload bindings in modal
+            loadCurrentBindings(zoneId);
+            // Clear form
+            document.getElementById('sourceValue').value = '';
+        } else {
+            showError(`<strong>Failed to add source:</strong><br><br>${data.error || data.message}`);
+        }
+    })
+    .catch(error => {
+        showError(`<strong>Error adding source:</strong><br><br>${error.message}`);
+    });
+}
+
+function removeSource(zoneId, source) {
+    const agentId = '{{ agent.id }}';
+    
+    showConfirm(`Remove source <strong>${source}</strong>?`, function() {
+        fetch(`/agents/${agentId}/zone/${zoneId}/source/${encodeURIComponent(source)}/remove/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+        })
+        .then(handleResponse)
+        .then(data => {
+            if (data.success) {
+                showSuccess(`Source <strong>${source}</strong> removed successfully!`);
+            } else {
+                showError(`<strong>Failed to remove source:</strong><br><br>${data.error || data.message}`);
+            }
+        })
+        .catch(error => {
+            showError(`<strong>Error removing source:</strong><br><br>${error.message}`);
+        });
+    });
+}
+
 function showCreateZoneModal() {
     const modal = new bootstrap.Modal(document.getElementById('createZoneModal'));
+    
+    // Template data
+    const templates = {
+        custom: { services: [], target: 'default', description: '' },
+        dmz: { services: ['ssh'], target: 'default', description: 'DMZ zone for publicly accessible services' },
+        internal: { services: ['ssh', 'mdns', 'samba-client', 'dhcpv6-client'], target: 'default', description: 'Internal zone for trusted network' },
+        external: { services: ['ssh'], target: 'default', description: 'External zone for untrusted network' },
+        public: { services: ['ssh', 'dhcpv6-client'], target: 'default', description: 'Public zone with limited services' },
+        work: { services: ['ssh', 'dhcpv6-client'], target: 'default', description: 'Work zone for office network' },
+        home: { services: ['ssh', 'mdns', 'samba-client', 'dhcpv6-client'], target: 'default', description: 'Home zone for home network' },
+        trusted: { services: [], target: 'ACCEPT', description: 'Trusted zone - all traffic accepted' },
+        block: { services: [], target: '%%REJECT%%', description: 'Block zone - all traffic rejected' },
+        drop: { services: [], target: 'DROP', description: 'Drop zone - all traffic dropped' }
+    };
+    
+    // Template card selection
+    document.querySelectorAll('.template-card').forEach(card => {
+        card.addEventListener('click', function() {
+            // Remove selection from all cards
+            document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+            // Mark this card as selected
+            this.classList.add('selected');
+            
+            const template = this.dataset.template;
+            document.getElementById('zoneTemplate').value = template;
+            
+            // Update form fields based on template
+            const templateData = templates[template];
+            if (templateData) {
+                document.getElementById('zoneTarget').value = templateData.target;
+                document.getElementById('zoneDescription').value = templateData.description;
+                
+                // Show preview
+                if (template !== 'custom') {
+                    document.getElementById('templatePreview').classList.remove('d-none');
+                    document.getElementById('previewServices').textContent = templateData.services.join(', ') || 'None';
+                    document.getElementById('previewTarget').textContent = templateData.target;
+                } else {
+                    document.getElementById('templatePreview').classList.add('d-none');
+                }
+            }
+        });
+    });
+    
+    // Select custom by default
+    document.querySelector('.template-card[data-template="custom"]').click();
     
     document.getElementById('createZoneSubmit').onclick = function() {
         const name = document.getElementById('zoneName').value.trim();
         const target = document.getElementById('zoneTarget').value;
-        if (name) {
-            modal.hide();
-            createZone(name, target);
+        const description = document.getElementById('zoneDescription').value.trim();
+        const permanent = document.getElementById('zonePermanent').checked;
+        const template = document.getElementById('zoneTemplate').value;
+        
+        // Validate zone name
+        if (!name) {
+            showError('Zone name is required');
+            return;
         }
+        
+        if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+            showError('Zone name can only contain letters, numbers, hyphens, and underscores');
+            return;
+        }
+        
+        modal.hide();
+        createZone(name, target, description, permanent, template);
     };
     
     modal.show();
+    // Reset form
     document.getElementById('zoneName').value = '';
+    document.getElementById('zoneDescription').value = '';
+    document.getElementById('zonePermanent').checked = true;
     setTimeout(() => document.getElementById('zoneName').focus(), 500);
 }
 
-function createZone(name, target) {
+function createZone(name, target, description, permanent, template) {
     const agentId = '{{ agent.id }}';
     
     fetch(`/agents/${agentId}/zone/create/`, {
@@ -1525,14 +2358,18 @@ function createZone(name, target) {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name: name, target: target })
+        body: JSON.stringify({ 
+            name: name, 
+            target: target,
+            description: description,
+            permanent: permanent,
+            template: template
+        })
     })
     .then(handleResponse)
     .then(data => {
         if (data.success) {
             showSuccess(`Zone <strong>${name}</strong> created successfully!`);
-            // Immediately refresh the zones display
-            checkForUpdates();
         } else {
             showError(`<strong>Failed to create zone:</strong><br><br>${data.error || data.message}`);
         }
@@ -1557,14 +2394,38 @@ function deleteZone(zoneId, zoneName) {
         .then(data => {
             if (data.success) {
                 showSuccess(`Zone <strong>${zoneName}</strong> deleted successfully!`);
-                // Immediately refresh the zones display
-                checkForUpdates();
             } else {
                 showError(`<strong>Failed to delete zone:</strong><br><br>${data.error || data.message}`);
             }
         })
         .catch(error => {
             showError(`<strong>Error deleting zone:</strong><br><br>${error.message}`);
+        });
+    });
+}
+
+function setDefaultZone(zoneName) {
+    const agentId = '{{ agent.id }}';
+    
+    showConfirm(`Set <strong>${zoneName}</strong> as the default zone?<br><small class="text-muted">This will be the zone used for new connections by default</small>`, function() {
+        fetch(`/agents/${agentId}/zone/set-default/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ zone: zoneName })
+        })
+        .then(handleResponse)
+        .then(data => {
+            if (data.success) {
+                showSuccess(`Default zone set to <strong>${zoneName}</strong> successfully!`);
+            } else {
+                showError(`<strong>Failed to set default zone:</strong><br><br>${data.error || data.message}`);
+            }
+        })
+        .catch(error => {
+            showError(`<strong>Error setting default zone:</strong><br><br>${error.message}`);
         });
     });
 }
@@ -1663,8 +2524,6 @@ function addToMultipleZones(name, type, zoneIds) {
             if (completed === zoneIds.length) {
                 if (errors.length === 0) {
                     showSuccess(`<strong>${name}</strong> added to ${zoneIds.length} zone${zoneIds.length !== 1 ? 's' : ''} successfully!`);
-                    // Immediately refresh the zones display
-                    checkForUpdates();
                 } else {
                     showError(`<strong>Some operations failed:</strong><br><br>${errors.join('<br>')}`);
                 }
@@ -1702,14 +2561,276 @@ function removeRuleGroup(name, type, ruleIds) {
         .then(data => {
             if (data.success) {
                 showSuccess(`<strong>${name}</strong> removed from all zones!<br><small>${data.deleted_count} rule${data.deleted_count !== 1 ? 's' : ''} deleted</small>`);
-                // Immediately refresh the zones display
-                checkForUpdates();
             } else {
                 showError(`<strong>Failed to delete rules:</strong><br><br>${data.error || data.message}`);
             }
         })
         .catch(error => {
             showError(`<strong>Error deleting rules:</strong><br><br>${error.message}`);
+        });
+    });
+}
+
+// Firewalld service control functions
+function checkFirewalldServiceStatus() {
+    const agentId = '{{ agent.id }}';
+    
+    fetch(`/agents/${agentId}/firewalld/service/status/`)
+        .then(handleResponse)
+        .then(data => {
+            if (data.success && data.data) {
+                updateFirewalldServiceUI(data.data);
+            } else {
+                updateFirewalldServiceUI({ active: false, status: 'unknown' });
+            }
+        })
+        .catch(error => {
+            console.error('Error checking firewalld service status:', error);
+            updateFirewalldServiceUI({ active: false, status: 'error' });
+        });
+}
+
+function updateFirewalldServiceUI(statusData) {
+    const statusBadge = document.getElementById('firewalld-status-badge');
+    const statusText = document.getElementById('firewalld-status-text');
+    const btnStart = document.getElementById('btn-start-firewalld');
+    const btnRestart = document.getElementById('btn-restart-firewalld');
+    const btnStop = document.getElementById('btn-stop-firewalld');
+    
+    if (!statusBadge) return;
+    
+    const isActive = statusData.active === true;
+    const isEnabled = statusData.enabled === true;
+    
+    // Update status badge
+    statusBadge.className = 'badge';
+    if (isActive) {
+        statusBadge.classList.add('bg-success');
+        statusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Active';
+    } else if (statusData.status === 'error') {
+        statusBadge.classList.add('bg-danger');
+        statusBadge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error';
+    } else {
+        statusBadge.classList.add('bg-danger');
+        statusBadge.innerHTML = '<i class="fas fa-stop-circle"></i> Inactive';
+    }
+    
+    // Update status text
+    if (statusText) {
+        if (isActive) {
+            statusText.textContent = `Service is running${isEnabled ? ' and enabled' : ' but not enabled'}`;
+        } else {
+            statusText.textContent = 'Service is not running';
+        }
+    }
+    
+    // Enable/disable buttons based on status
+    if (btnStart) {
+        btnStart.disabled = isActive;
+    }
+    if (btnRestart) {
+        btnRestart.disabled = !isActive;
+    }
+    if (btnStop) {
+        btnStop.disabled = !isActive;
+    }
+}
+
+function controlFirewalldService(action) {
+    const agentId = '{{ agent.id }}';
+    
+    let actionName = '';
+    let confirmMessage = '';
+    
+    switch(action) {
+        case 'start_service':
+            actionName = 'start';
+            confirmMessage = 'Are you sure you want to <strong>start</strong> the firewalld service?';
+            break;
+        case 'restart_service':
+            actionName = 'restart';
+            confirmMessage = 'Are you sure you want to <strong>restart</strong> the firewalld service?<br><small class="text-warning">This will temporarily interrupt firewall protection.</small>';
+            break;
+        case 'stop_service':
+            actionName = 'stop';
+            confirmMessage = '<strong class="text-danger">⚠️ WARNING: DANGEROUS OPERATION</strong><br><br>Are you sure you want to <strong>stop</strong> the firewalld service?<br><br><span class="text-danger">This will disable ALL firewall rules and expose your system to security risks!</span>';
+            break;
+        default:
+            showError('Invalid action');
+            return;
+    }
+    
+    showConfirm(confirmMessage, function() {
+        // Disable all buttons during operation
+        document.getElementById('btn-start-firewalld').disabled = true;
+        document.getElementById('btn-restart-firewalld').disabled = true;
+        document.getElementById('btn-stop-firewalld').disabled = true;
+        
+        // Update status badge to show processing
+        const statusBadge = document.getElementById('firewalld-status-badge');
+        statusBadge.className = 'badge bg-warning';
+        statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        
+        fetch(`/agents/${agentId}/firewalld/service/control/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: action })
+        })
+        .then(handleResponse)
+        .then(data => {
+            if (data.success) {
+                showSuccess(`Firewalld service ${actionName}ed successfully!`, false);
+                // Refresh service status after a short delay
+                setTimeout(checkFirewalldServiceStatus, 2000);
+            } else {
+                showError(`<strong>Failed to ${actionName} service:</strong><br><br>${data.error || 'Unknown error'}`);
+                checkFirewalldServiceStatus();
+            }
+        })
+        .catch(error => {
+            showError(`<strong>Error ${actionName}ing service:</strong><br><br>${error.message}`);
+            checkFirewalldServiceStatus();
+        });
+    });
+}
+
+// Panic mode control functions
+function checkPanicModeStatus() {
+    const agentId = '{{ agent.id }}';
+    
+    fetch(`/agents/${agentId}/panic/status/`)
+        .then(handleResponse)
+        .then(data => {
+            if (data.success && data.data) {
+                updatePanicModeUI(data.data);
+            } else {
+                updatePanicModeUI({ panic_mode: false, status: 'unknown' });
+            }
+        })
+        .catch(error => {
+            console.error('Error checking panic mode status:', error);
+            updatePanicModeUI({ panic_mode: false, status: 'error' });
+        });
+}
+
+function updatePanicModeUI(statusData) {
+    const statusBadge = document.getElementById('panic-status-badge');
+    const statusText = document.getElementById('panic-status-text');
+    const btnPanicOn = document.getElementById('btn-panic-on');
+    const btnPanicOff = document.getElementById('btn-panic-off');
+    
+    if (!statusBadge) return;
+    
+    const isPanicEnabled = statusData.panic_mode === true;
+    
+    // Update status badge
+    statusBadge.className = 'badge';
+    if (isPanicEnabled) {
+        statusBadge.classList.add('bg-danger');
+        statusBadge.innerHTML = '<i class="fas fa-ban"></i> ENABLED - ALL TRAFFIC BLOCKED';
+    } else if (statusData.status === 'error') {
+        statusBadge.classList.add('bg-secondary');
+        statusBadge.innerHTML = '<i class="fas fa-exclamation-circle"></i> Error';
+    } else {
+        statusBadge.classList.add('bg-success');
+        statusBadge.innerHTML = '<i class="fas fa-check-circle"></i> Disabled';
+    }
+    
+    // Update status text
+    if (statusText) {
+        if (isPanicEnabled) {
+            statusText.textContent = 'All network traffic is being dropped!';
+            statusText.className = 'text-danger fw-bold';
+        } else {
+            statusText.textContent = 'Normal firewall operation';
+            statusText.className = 'text-muted';
+        }
+    }
+    
+    // Enable/disable buttons based on status
+    if (btnPanicOn) {
+        btnPanicOn.disabled = isPanicEnabled;
+    }
+    if (btnPanicOff) {
+        btnPanicOff.disabled = !isPanicEnabled;
+    }
+}
+
+function controlPanicMode(action) {
+    const agentId = '{{ agent.id }}';
+    
+    let actionName = '';
+    let confirmMessage = '';
+    
+    if (action === 'panic_on') {
+        actionName = 'enable';
+        confirmMessage = `
+            <div class="text-center">
+                <i class="fas fa-skull-crossbones fa-3x text-danger mb-3"></i>
+                <h5 class="text-danger">⚠️ EXTREME DANGER ⚠️</h5>
+                <p class="mb-3"><strong>You are about to enable PANIC MODE!</strong></p>
+                <div class="alert alert-danger text-start mb-3">
+                    <strong>What will happen:</strong>
+                    <ul class="mb-0">
+                        <li>ALL incoming network traffic will be DROPPED</li>
+                        <li>ALL outgoing network traffic will be DROPPED</li>
+                        <li>You will likely LOSE SSH/web connectivity</li>
+                        <li>Physical/console access may be required to disable</li>
+                    </ul>
+                </div>
+                <p><strong>Only proceed if this is an emergency security situation!</strong></p>
+                <p class="text-muted small">This action will be logged with CRITICAL severity</p>
+            </div>
+        `;
+    } else if (action === 'panic_off') {
+        actionName = 'disable';
+        confirmMessage = `
+            <div class="text-center">
+                <h5>Disable Panic Mode</h5>
+                <p>This will restore normal firewall operation.</p>
+                <p class="text-success"><i class="fas fa-check-circle"></i> Network connectivity will be restored based on your firewall rules.</p>
+            </div>
+        `;
+    } else {
+        showError('Invalid action');
+        return;
+    }
+    
+    showConfirm(confirmMessage, function() {
+        // Disable all buttons during operation
+        document.getElementById('btn-panic-on').disabled = true;
+        document.getElementById('btn-panic-off').disabled = true;
+        
+        // Update status badge to show processing
+        const statusBadge = document.getElementById('panic-status-badge');
+        statusBadge.className = 'badge bg-warning';
+        statusBadge.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+        
+        fetch(`/agents/${agentId}/panic/control/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: action })
+        })
+        .then(handleResponse)
+        .then(data => {
+            if (data.success) {
+                showSuccess(`Panic mode ${actionName}d successfully!`, false);
+                // Refresh status after a short delay
+                setTimeout(checkPanicModeStatus, 2000);
+            } else {
+                showError(`<strong>Failed to ${actionName} panic mode:</strong><br><br>${data.error || 'Unknown error'}`);
+                checkPanicModeStatus();
+            }
+        })
+        .catch(error => {
+            showError(`<strong>Error ${actionName}ing panic mode:</strong><br><br>${error.message}`);
+            checkPanicModeStatus();
         });
     });
 }
@@ -1767,7 +2888,20 @@ document.addEventListener('DOMContentLoaded', function() {
     // - Push mode: Server pushes to agent at sync interval
     // Frontend polls for data changes every 5 seconds and updates display when changed
     
+    // Check firewalld service status on page load
+    {% if firewalld_enabled %}
+    checkFirewalldServiceStatus();
+    // Poll service status every 10 seconds
+    setInterval(checkFirewalldServiceStatus, 10000);
+    
+    // Check panic mode status on page load
+    checkPanicModeStatus();
+    // Poll panic mode status every 10 seconds
+    setInterval(checkPanicModeStatus, 10000);
+    {% endif %}
+    
     // Start polling for updates
+    // Start polling for updates every 5 seconds
     setInterval(checkForUpdates, 5000);
     setTimeout(checkForUpdates, 1000);
 });

@@ -285,12 +285,22 @@ class SSHConnectionManager(BaseConnectionManager):
             if exit_code == 0 and stdout.strip():
                 try:
                     result = json.loads(stdout)
-                    success = result.get('success', False)
-                    output = result.get('result', {})
-                    error = result.get('error')
                     
-                    # Log the command
-                    AgentCommand.objects.create(
+                    # Check if response has the {success, result, error} wrapper
+                    if 'success' in result or 'result' in result or 'error' in result:
+                        # Wrapped format: {success: bool, result: any, error: str}
+                        success = result.get('success', False)
+                        output = result.get('result', {})
+                        error = result.get('error')
+                    else:
+                        # Direct rootd response format - treat entire response as result
+                        success = True
+                        output = result
+                        error = None
+                    
+                    # Log the command (wrap database call for async context)
+                    from asgiref.sync import sync_to_async
+                    await sync_to_async(AgentCommand.objects.create)(
                         agent=self.agent,
                         module=module,
                         action=command,
@@ -307,7 +317,8 @@ class SSHConnectionManager(BaseConnectionManager):
                     }
                 except json.JSONDecodeError:
                     # If not JSON, treat as plain text output
-                    AgentCommand.objects.create(
+                    from asgiref.sync import sync_to_async
+                    await sync_to_async(AgentCommand.objects.create)(
                         agent=self.agent,
                         module=module,
                         action=command,
@@ -322,7 +333,8 @@ class SSHConnectionManager(BaseConnectionManager):
                     }
             else:
                 # Command failed
-                AgentCommand.objects.create(
+                from asgiref.sync import sync_to_async
+                await sync_to_async(AgentCommand.objects.create)(
                     agent=self.agent,
                     module=module,
                     action=command,

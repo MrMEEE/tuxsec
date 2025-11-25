@@ -1,3 +1,0 @@
-"""
-TuxSec Web UI package.
-"""

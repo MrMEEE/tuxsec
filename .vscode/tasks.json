@@ -16,6 +16,14 @@
 			"isBackground": true,
 			"problemMatcher": [],
 			"group": "build"
+		},
+		{
+			"label": "Start Sync Daemon",
+			"type": "shell",
+			"command": "cd web_ui && mkdir -p logs && ../.venv/bin/python manage.py sync_agents --daemon --interval 5 2>&1 | tee logs/sync.log",
+			"isBackground": true,
+			"problemMatcher": [],
+			"group": "build"
 		}
 	]
 }

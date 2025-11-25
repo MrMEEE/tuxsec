@@ -94,7 +94,58 @@ cd web_ui && python manage.py migrate && python manage.py createsuperuser && cd 
 - **[API Server](api_server/)**: FastAPI REST API for programmatic access
 - **[Agent v2.0](agent/)**: **NEW** Two-component secure agent with module system
 - **[Shared](shared/)**: Common models, utilities, and configuration
-- **[Module System](MODULE_SYSTEM.md)**: Plugin-based architecture for security modules
+
+## 🔌 Module System
+
+TuxSec uses a **modular plugin architecture** for security features. Each module is self-contained with its own models, views, and sync logic.
+
+**Current Modules:**
+- **firewalld** - Firewall management (zones, rules, services)
+- **systeminfo** - System information and monitoring
+- **venv** - Python virtual environment management
+
+**Coming Soon:**
+- **aide** - File integrity monitoring
+- **selinux** - SELinux policy management
+- **clamav** - Antivirus scanning
+
+### 📚 Complete Module Documentation
+
+**Start Here:** 
+- � **[Documentation Index](MODULES_INDEX.md)** - Complete guide to all module documentation
+
+**Quick Links:**
+- 📊 **[Summary](MODULES_SUMMARY.md)** - High-level overview and project status (5 min)
+- 🏗️ **[Architecture](MODULES_REFACTORING.md)** - Complete refactoring plan and architecture (30 min)
+- � **[Implementation Guide](MODULES_IMPLEMENTATION_GUIDE.md)** - Step-by-step instructions (45 min)
+- ⚡ **[Quick Reference](MODULES_QUICK_REFERENCE.md)** - Fast module creation guide (15 min)
+- 📸 **[Visual Guide](MODULES_VISUAL_GUIDE.md)** - Architecture diagrams and flows (10 min)
+
+**Creating Your First Module:**
+```bash
+# See MODULES_QUICK_REFERENCE.md for complete examples
+
+# 1. Create module structure
+mkdir -p web_ui/modules/mymodule
+cd web_ui/modules/mymodule
+
+# 2. Create module.py (5 minutes)
+cat > module.py << 'EOF'
+from modules.base.module import BaseModule
+
+class MyModule(BaseModule):
+    def get_name(self):
+        return "mymodule"
+    
+    def get_display_name(self):
+        return "My Security Module"
+EOF
+
+# 3. Register in modules/__init__.py
+# 4. Enable in Web UI - Done!
+
+# See documentation for adding database, REST API, auto-sync, etc.
+```
 
 ## 🎁 Agent Packages
 
@@ -119,16 +170,55 @@ sudo tuxsec-setup  # Interactive configuration wizard
 
 ## Features
 
-- **Modular Architecture**: Plugin-based system for security features (Firewalld, SELinux, ClamAV, AIDE)
-- **Per-Agent Module Control**: Enable/disable specific modules on individual agents
-- **Visual Network Management**: Drag-and-drop interface for defining network connections
-- **Comprehensive Firewall Control**: Support for all firewalld features including rich rules and masquerade
-- **SELinux Management**: Control SELinux modes, booleans, and contexts
-- **Secure Communication**: Self-signed certificate-based authentication between components
-- **Role-Based Access**: Granular user permissions for different server groups
-- **Real-time Updates**: Live status monitoring and configuration synchronization
-- **Dual Operation Modes**: Support for both agent-initiated (pull) and server-initiated (push) communication
-- **Module Action Logging**: Complete audit trail of all module actions
+TuxSec provides **19 comprehensive firewall management features** covering all aspects of firewalld configuration:
+
+### 🔐 Core Security Features
+- **Audit Log System** - Complete audit trail with filtering and search
+- **Smart Reload Operations** - Intelligent configuration validation and reload
+- **Panic Mode** - Emergency firewall shutdown blocking all traffic
+- **Lockdown Whitelist** - Restrict firewall modifications to authorized users/applications
+
+### 🛡️ Firewall Zone Management
+- **Zone Management** - Create custom zones, modify defaults, set targets
+- **Tabbed Zone Interface** - Organized UI with General/Advanced/Forwarding/Settings tabs
+- **Interface & Source Bindings** - Bind network interfaces and IPs to zones
+
+### 🔥 Firewall Services & Rules
+- **Custom Service Management** - Create and manage custom services with multiple ports
+- **Policy Matrix** - Zone-to-zone traffic policies with rich rules
+- **ICMP Block Management** - Block specific ICMP message types per zone
+- **Helper Module Management** - Netfilter connection tracking helpers (FTP, SIP, etc.)
+- **Firewalld Service Control** - Start, stop, restart firewalld service
+- **Log Denied Packets** - Configure logging levels for denied traffic
+
+### 🗂️ Advanced Features
+- **IPSet Management** - Efficient IP address list management with 5 types
+- **Direct Rules Management** - Direct iptables rule management with passthrough
+
+### 📋 Configuration Templates
+- **Template System** - Complete template management with 4 phases:
+  - Phase 1: Database model for reusable configurations
+  - Phase 2: CRUD views for template management
+  - Phase 3: Apply logic with preview and rollback
+  - Phase 4: Full-featured UI with grid view and filtering
+
+**8 Pre-configured Templates:**
+- Basic Web Server, Database Server, DMZ Web Server, Office Workstation
+- Home Network, NAT Gateway, High Security Server, Container Host
+
+### 📊 Technical Implementation
+- **87 agent capabilities** across all firewall operations
+- **100+ backend API views** with validation and error handling
+- **120+ URL routes** for complete functionality
+- **18 database migrations** with comprehensive models
+- **Real-time sync** with configurable intervals (default: 3 seconds)
+
+### 📚 Documentation
+- **[FEATURES.md](FEATURES.md)** - Complete feature documentation with usage examples
+- **[API_REFERENCE.md](API_REFERENCE.md)** - Full API reference with request/response examples
+- **[agent/README.md](agent/README.md)** - Agent architecture v2.0 modular design
+- **[AUTOSYNC_AND_RULES.md](AUTOSYNC_AND_RULES.md)** - Auto-sync configuration guide
+
 
 ## Quick Start
 

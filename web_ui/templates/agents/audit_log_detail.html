@@ -1,0 +1,231 @@
+{% extends "base.html" %}
+{% load static %}
+{% load agent_filters %}
+
+{% block title %}Audit Log Detail - TuxSec{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'audit-log-list' %}">Audit Logs</a></li>
+                    <li class="breadcrumb-item active">{{ log.id }}</li>
+                </ol>
+            </nav>
+            <h2>
+                {% if log.success %}
+                <i class="bi bi-check-circle-fill text-success"></i>
+                {% else %}
+                <i class="bi bi-x-circle-fill text-danger"></i>
+                {% endif %}
+                Audit Log Detail
+            </h2>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Overview Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Overview</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Timestamp:</div>
+                        <div class="col-md-9">{{ log.timestamp|date:"Y-m-d H:i:s.u" }}</div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">User:</div>
+                        <div class="col-md-9">
+                            <span class="badge bg-secondary">{{ log.username }}</span>
+                            {% if log.ip_address %}
+                            <span class="text-muted ms-2">from {{ log.ip_address }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Agent:</div>
+                        <div class="col-md-9">
+                            {% if log.agent %}
+                            <a href="{% url 'dashboard-agent-detail' log.agent.id %}"><code>{{ log.agent_hostname }}</code></a>
+                            {% elif log.agent_hostname %}
+                            <code>{{ log.agent_hostname }}</code> <span class="badge bg-warning text-dark">Deleted</span>
+                            {% else %}
+                            <span class="text-muted">System-wide operation</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Module:</div>
+                        <div class="col-md-9"><span class="badge bg-info">{{ log.module }}</span></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Action:</div>
+                        <div class="col-md-9"><code>{{ log.action }}</code></div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Category:</div>
+                        <div class="col-md-9">
+                            {% if log.action_category == 'read' %}
+                            <span class="badge bg-secondary">{{ log.get_action_category_display }}</span>
+                            {% elif log.action_category == 'create' %}
+                            <span class="badge bg-success">{{ log.get_action_category_display }}</span>
+                            {% elif log.action_category == 'update' %}
+                            <span class="badge bg-primary">{{ log.get_action_category_display }}</span>
+                            {% elif log.action_category == 'delete' %}
+                            <span class="badge bg-danger">{{ log.get_action_category_display }}</span>
+                            {% else %}
+                            <span class="badge bg-dark">{{ log.get_action_category_display }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Status:</div>
+                        <div class="col-md-9">
+                            {% if log.success %}
+                            <span class="badge bg-success">Success</span>
+                            {% else %}
+                            <span class="badge bg-danger">Failed</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-3 fw-bold">Severity:</div>
+                        <div class="col-md-9">
+                            {% if log.severity == 'critical' %}
+                            <span class="badge bg-danger">{{ log.get_severity_display }}</span>
+                            {% elif log.severity == 'warning' %}
+                            <span class="badge bg-warning text-dark">{{ log.get_severity_display }}</span>
+                            {% else %}
+                            <span class="badge bg-info">{{ log.get_severity_display }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3 fw-bold">Description:</div>
+                        <div class="col-md-9">{{ log.description }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Parameters Card -->
+            {% if log.params %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> Parameters</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 rounded"><code>{{ log.params|pprint }}</code></pre>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Result Card -->
+            {% if log.result %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-check2-square"></i> Result</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="bg-light p-3 rounded"><code>{{ log.result|pprint }}</code></pre>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Error Message Card -->
+            {% if log.error_message %}
+            <div class="card mb-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Error Message</h5>
+                </div>
+                <div class="card-body">
+                    <pre class="text-danger">{{ log.error_message }}</pre>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- State Changes Card -->
+            {% if log.before_state or log.after_state %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> State Changes</h5>
+                </div>
+                <div class="card-body">
+                    {% if log.before_state %}
+                    <h6>Before:</h6>
+                    <pre class="bg-light p-3 rounded"><code>{{ log.before_state|pprint }}</code></pre>
+                    {% endif %}
+                    
+                    {% if log.after_state %}
+                    <h6 class="mt-3">After:</h6>
+                    <pre class="bg-light p-3 rounded"><code>{{ log.after_state|pprint }}</code></pre>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Metadata Card -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-tags"></i> Metadata</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Log ID:</strong><br>
+                        <code class="small">{{ log.id }}</code>
+                    </div>
+                    
+                    {% if log.command %}
+                    <div class="mb-3">
+                        <strong>Associated Command:</strong><br>
+                        <a href="{% url 'dashboard-agent-detail' log.agent.id %}#commands"><code>{{ log.command.id }}</code></a>
+                    </div>
+                    {% endif %}
+                    
+                    {% if log.session_id %}
+                    <div class="mb-3">
+                        <strong>Session ID:</strong><br>
+                        <code class="small">{{ log.session_id }}</code>
+                    </div>
+                    {% endif %}
+                    
+                    {% if log.tags %}
+                    <div class="mb-3">
+                        <strong>Tags:</strong><br>
+                        {% for tag in log.tags %}
+                        <span class="badge bg-secondary me-1">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Actions Card -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-lightning"></i> Actions</h5>
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'audit-log-list' %}" class="btn btn-secondary w-100 mb-2">
+                        <i class="bi bi-arrow-left"></i> Back to Audit Logs
+                    </a>
+                    
+                    {% if log.agent %}
+                    <a href="{% url 'dashboard-agent-detail' log.agent.id %}" class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-server"></i> View Agent
+                    </a>
+                    <a href="{% url 'agent-audit-logs' log.agent.id %}" class="btn btn-info w-100">
+                        <i class="bi bi-journal-text"></i> All Logs for This Agent
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

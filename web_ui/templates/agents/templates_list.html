@@ -1,0 +1,884 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Firewall Templates - TuxSec{% endblock %}
+
+{% block extra_css %}
+<style>
+    .template-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+        height: 100%;
+    }
+    .template-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+    }
+    .category-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.25rem;
+    }
+    .category-server { background-color: #0d6efd; color: white; }
+    .category-workstation { background-color: #6610f2; color: white; }
+    .category-dmz { background-color: #fd7e14; color: white; }
+    .category-network { background-color: #198754; color: white; }
+    .category-custom { background-color: #6c757d; color: white; }
+    .usage-count {
+        font-size: 0.85rem;
+        color: #6c757d;
+    }
+    .config-preview {
+        background-color: #f8f9fa;
+        border-left: 3px solid #0d6efd;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        font-size: 0.85rem;
+    }
+    .config-item {
+        display: inline-block;
+        margin-right: 1rem;
+        color: #495057;
+    }
+    .config-item i {
+        margin-right: 0.25rem;
+        color: #0d6efd;
+    }
+    .global-badge {
+        background-color: #0dcaf0;
+        color: #000;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: 0.2rem;
+        margin-left: 0.5rem;
+    }
+    .template-actions {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #dee2e6;
+    }
+    .template-actions button {
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .filter-section {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        margin-bottom: 2rem;
+    }
+    .preview-section {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    .preview-group {
+        margin-bottom: 1rem;
+    }
+    .preview-group h6 {
+        color: #0d6efd;
+        margin-bottom: 0.5rem;
+        font-weight: 600;
+    }
+    .preview-item {
+        padding: 0.5rem;
+        background-color: #f8f9fa;
+        border-left: 3px solid #28a745;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .preview-item.will-create {
+        border-left-color: #ffc107;
+    }
+    .preview-item code {
+        background-color: #e9ecef;
+        padding: 0.1rem 0.3rem;
+        border-radius: 0.2rem;
+        font-size: 0.85rem;
+    }
+    #applyProgress {
+        display: none;
+        margin-top: 1rem;
+    }
+    .result-section {
+        margin-top: 1rem;
+        padding: 1rem;
+        border-radius: 0.5rem;
+    }
+    .result-section.success {
+        background-color: #d1e7dd;
+        border: 1px solid #badbcc;
+    }
+    .result-section.partial {
+        background-color: #fff3cd;
+        border: 1px solid #ffecb5;
+    }
+    .result-section.error {
+        background-color: #f8d7da;
+        border: 1px solid #f5c2c7;
+    }
+    .result-item {
+        padding: 0.5rem;
+        margin-bottom: 0.5rem;
+        border-radius: 0.25rem;
+        background-color: rgba(255,255,255,0.5);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="fas fa-file-code"></i> Firewall Templates</h2>
+            <p class="text-muted mb-0">Pre-configured firewall templates for common scenarios</p>
+        </div>
+        <div>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
+                <i class="fas fa-plus"></i> Create Template
+            </button>
+        </div>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+        <div class="row align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Category</label>
+                <select id="categoryFilter" class="form-select">
+                    <option value="">All Categories</option>
+                    <option value="server">Server</option>
+                    <option value="workstation">Workstation</option>
+                    <option value="dmz">DMZ</option>
+                    <option value="network">Network</option>
+                    <option value="custom">Custom</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Search</label>
+                <input type="text" id="searchFilter" class="form-control" placeholder="Search templates...">
+            </div>
+            <div class="col-md-2">
+                <div class="form-check">
+                    <input type="checkbox" id="globalOnlyFilter" class="form-check-input">
+                    <label class="form-check-label" for="globalOnlyFilter">Global Only</label>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-secondary w-100" onclick="resetFilters()">
+                    <i class="fas fa-redo"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Templates Grid -->
+    <div id="templatesGrid" class="row">
+        <!-- Templates will be loaded here -->
+    </div>
+</div>
+
+<!-- Create Template Modal -->
+<div class="modal fade" id="createTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Firewall Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createTemplateForm">
+                    <div class="mb-3">
+                        <label class="form-label">Name *</label>
+                        <input type="text" name="name" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Category *</label>
+                        <select name="category" class="form-select" required>
+                            <option value="server">Server</option>
+                            <option value="workstation">Workstation</option>
+                            <option value="dmz">DMZ</option>
+                            <option value="network">Network</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Configuration (JSON) *</label>
+                        <textarea name="configuration" class="form-control font-monospace" rows="10" required placeholder='{
+  "zones": {...},
+  "policies": [...],
+  "custom_services": [...],
+  "ipsets": [...]
+}'></textarea>
+                        <small class="text-muted">Enter template configuration in JSON format</small>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" name="is_global" class="form-check-input" id="isGlobal">
+                        <label class="form-check-label" for="isGlobal">Make this template global (available to all users)</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tags (comma-separated)</label>
+                        <input type="text" name="tags" class="form-control" placeholder="web, security, production">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createTemplate()">Create Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Detail Modal -->
+<div class="modal fade" id="templateDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="templateDetailTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="templateDetailContent">
+                    <!-- Template details will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-info" onclick="duplicateCurrentTemplate()">
+                    <i class="fas fa-copy"></i> Duplicate
+                </button>
+                <button type="button" class="btn btn-primary" onclick="showApplyModal()">
+                    <i class="fas fa-play"></i> Apply Template
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Apply Template Modal -->
+<div class="modal fade" id="applyTemplateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Apply Template: <span id="applyTemplateName"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Select Agent *</label>
+                    <select id="applyAgentSelect" class="form-select" required>
+                        <option value="">-- Select an agent --</option>
+                    </select>
+                </div>
+
+                <div id="previewSection" style="display: none;">
+                    <h6>Preview Changes</h6>
+                    <div id="previewContent" class="preview-section">
+                        <!-- Preview content will be loaded here -->
+                    </div>
+                </div>
+
+                <div id="applyProgress">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                    <p class="text-center mt-2">Applying template...</p>
+                </div>
+
+                <div id="applyResults" style="display: none;">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" id="previewButton" class="btn btn-info" onclick="previewTemplate()">
+                    <i class="fas fa-eye"></i> Preview Changes
+                </button>
+                <button type="button" id="applyButton" class="btn btn-success" onclick="applyTemplate()" style="display: none;">
+                    <i class="fas fa-check"></i> Apply Template
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentTemplate = null;
+let allTemplates = [];
+
+// Load templates on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadTemplates();
+    loadAgents();
+});
+
+// Load all templates
+async function loadTemplates() {
+    try {
+        const category = document.getElementById('categoryFilter').value;
+        const search = document.getElementById('searchFilter').value;
+        
+        let url = '/agents/api/templates/';
+        const params = new URLSearchParams();
+        if (category) params.append('category', category);
+        if (search) params.append('search', search);
+        if (params.toString()) url += '?' + params.toString();
+
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            allTemplates = data.templates;
+            displayTemplates(data.templates);
+        } else {
+            showAlert('danger', 'Failed to load templates');
+        }
+    } catch (error) {
+        console.error('Error loading templates:', error);
+        showAlert('danger', 'Error loading templates');
+    }
+}
+
+// Display templates in grid
+function displayTemplates(templates) {
+    const grid = document.getElementById('templatesGrid');
+    
+    if (templates.length === 0) {
+        grid.innerHTML = '<div class="col-12"><div class="alert alert-info">No templates found</div></div>';
+        return;
+    }
+
+    grid.innerHTML = templates.map(template => {
+        const config = template.configuration;
+        const zonesCount = Object.keys(config.zones || {}).length;
+        const servicesCount = (config.custom_services || []).length;
+        const policiesCount = (config.policies || []).length;
+        const ipsetsCount = (config.ipsets || []).length;
+        
+        return `
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card template-card" onclick="viewTemplate('${template.id}')">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">
+                                ${template.name}
+                                ${template.is_global ? '<span class="global-badge">GLOBAL</span>' : ''}
+                            </h5>
+                            <span class="category-badge category-${template.category}">${template.category.toUpperCase()}</span>
+                        </div>
+                        <p class="card-text text-muted small">${template.description || 'No description'}</p>
+                        
+                        <div class="config-preview">
+                            <div class="config-item">
+                                <i class="fas fa-layer-group"></i> ${zonesCount} Zone${zonesCount !== 1 ? 's' : ''}
+                            </div>
+                            <div class="config-item">
+                                <i class="fas fa-server"></i> ${servicesCount} Service${servicesCount !== 1 ? 's' : ''}
+                            </div>
+                            <div class="config-item">
+                                <i class="fas fa-shield-alt"></i> ${policiesCount} Polic${policiesCount !== 1 ? 'ies' : 'y'}
+                            </div>
+                            <div class="config-item">
+                                <i class="fas fa-list"></i> ${ipsetsCount} IPSet${ipsetsCount !== 1 ? 's' : ''}
+                            </div>
+                        </div>
+
+                        <div class="template-actions">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="usage-count">
+                                    <i class="fas fa-download"></i> Used ${template.usage_count || 0} time${template.usage_count !== 1 ? 's' : ''}
+                                </span>
+                                <div>
+                                    ${template.tags ? template.tags.split(',').slice(0, 2).map(tag => 
+                                        `<span class="badge bg-secondary">${tag.trim()}</span>`
+                                    ).join(' ') : ''}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// View template details
+async function viewTemplate(templateId) {
+    try {
+        const response = await fetch(`/agents/api/templates/${templateId}/`);
+        const data = await response.json();
+        
+        if (data.success) {
+            currentTemplate = data.template;
+            showTemplateDetail(data.template);
+        } else {
+            showAlert('danger', 'Failed to load template details');
+        }
+    } catch (error) {
+        console.error('Error loading template:', error);
+        showAlert('danger', 'Error loading template details');
+    }
+}
+
+// Show template detail modal
+function showTemplateDetail(template) {
+    document.getElementById('templateDetailTitle').textContent = template.name;
+    
+    const config = template.configuration;
+    const content = `
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <strong>Category:</strong> <span class="category-badge category-${template.category}">${template.category.toUpperCase()}</span>
+            </div>
+            <div class="col-md-6 mb-3">
+                <strong>Created:</strong> ${new Date(template.created_at).toLocaleDateString()}
+            </div>
+            <div class="col-md-12 mb-3">
+                <strong>Description:</strong><br>
+                ${template.description || 'No description'}
+            </div>
+            ${template.tags ? `
+            <div class="col-md-12 mb-3">
+                <strong>Tags:</strong><br>
+                ${template.tags.split(',').map(tag => `<span class="badge bg-secondary">${tag.trim()}</span>`).join(' ')}
+            </div>
+            ` : ''}
+        </div>
+
+        <hr>
+
+        <h6 class="mb-3"><i class="fas fa-cog"></i> Configuration</h6>
+        
+        ${Object.keys(config.zones || {}).length > 0 ? `
+        <div class="preview-group">
+            <h6>Zones (${Object.keys(config.zones).length})</h6>
+            ${Object.entries(config.zones).map(([zoneName, zoneConfig]) => `
+                <div class="preview-item">
+                    <strong>${zoneName}</strong>
+                    <div class="ms-3 mt-1">
+                        ${zoneConfig.services ? `<div><i class="fas fa-server"></i> Services: ${zoneConfig.services.join(', ')}</div>` : ''}
+                        ${zoneConfig.ports ? `<div><i class="fas fa-plug"></i> Ports: ${zoneConfig.ports.join(', ')}</div>` : ''}
+                        ${zoneConfig.target ? `<div><i class="fas fa-bullseye"></i> Target: ${zoneConfig.target}</div>` : ''}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        ${(config.custom_services || []).length > 0 ? `
+        <div class="preview-group">
+            <h6>Custom Services (${config.custom_services.length})</h6>
+            ${config.custom_services.map(svc => `
+                <div class="preview-item">
+                    <strong>${svc.name}</strong> - ${svc.ports.join(', ')}
+                    ${svc.description ? `<div class="text-muted small">${svc.description}</div>` : ''}
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        ${(config.policies || []).length > 0 ? `
+        <div class="preview-group">
+            <h6>Policies (${config.policies.length})</h6>
+            ${config.policies.map(policy => `
+                <div class="preview-item">
+                    <strong>${policy.name}</strong> - ${policy.target}
+                    <div class="ms-3 mt-1">
+                        <div><i class="fas fa-sign-in-alt"></i> From: ${policy.ingress_zones.join(', ')}</div>
+                        <div><i class="fas fa-sign-out-alt"></i> To: ${policy.egress_zones.join(', ')}</div>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        ${(config.ipsets || []).length > 0 ? `
+        <div class="preview-group">
+            <h6>IPSets (${config.ipsets.length})</h6>
+            ${config.ipsets.map(ipset => `
+                <div class="preview-item">
+                    <strong>${ipset.name}</strong> (${ipset.type}) - ${ipset.entries.length} entries
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        <hr>
+
+        <h6 class="mb-3"><i class="fas fa-code"></i> Raw Configuration</h6>
+        <pre class="bg-light p-3 rounded"><code>${JSON.stringify(config, null, 2)}</code></pre>
+    `;
+    
+    document.getElementById('templateDetailContent').innerHTML = content;
+    
+    const modal = new bootstrap.Modal(document.getElementById('templateDetailModal'));
+    modal.show();
+}
+
+// Create template
+async function createTemplate() {
+    const form = document.getElementById('createTemplateForm');
+    const formData = new FormData(form);
+    
+    try {
+        // Parse configuration JSON
+        const configText = formData.get('configuration');
+        const configuration = JSON.parse(configText);
+        
+        const data = {
+            name: formData.get('name'),
+            description: formData.get('description'),
+            category: formData.get('category'),
+            configuration: configuration,
+            is_global: formData.get('is_global') === 'on',
+            tags: formData.get('tags')
+        };
+        
+        const response = await fetch('/agents/api/templates/create/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('success', 'Template created successfully');
+            bootstrap.Modal.getInstance(document.getElementById('createTemplateModal')).hide();
+            form.reset();
+            loadTemplates();
+        } else {
+            showAlert('danger', result.error || 'Failed to create template');
+        }
+    } catch (error) {
+        console.error('Error creating template:', error);
+        showAlert('danger', 'Invalid JSON configuration or error creating template');
+    }
+}
+
+// Duplicate template
+async function duplicateCurrentTemplate() {
+    if (!currentTemplate) return;
+    
+    try {
+        const response = await fetch(`/agents/api/templates/${currentTemplate.id}/duplicate/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCookie('csrftoken')
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            showAlert('success', 'Template duplicated successfully');
+            loadTemplates();
+        } else {
+            showAlert('danger', data.error || 'Failed to duplicate template');
+        }
+    } catch (error) {
+        console.error('Error duplicating template:', error);
+        showAlert('danger', 'Error duplicating template');
+    }
+}
+
+// Load agents for apply modal
+async function loadAgents() {
+    try {
+        const response = await fetch('/agents/api/');
+        const agents = await response.json();
+        
+        const select = document.getElementById('applyAgentSelect');
+        select.innerHTML = '<option value="">-- Select an agent --</option>' +
+            agents.map(agent => 
+                `<option value="${agent.id}">${agent.hostname} (${agent.ip_address})</option>`
+            ).join('');
+    } catch (error) {
+        console.error('Error loading agents:', error);
+    }
+}
+
+// Show apply modal
+function showApplyModal() {
+    if (!currentTemplate) return;
+    
+    document.getElementById('applyTemplateName').textContent = currentTemplate.name;
+    document.getElementById('previewSection').style.display = 'none';
+    document.getElementById('applyResults').style.display = 'none';
+    document.getElementById('applyButton').style.display = 'none';
+    document.getElementById('previewButton').style.display = 'inline-block';
+    
+    bootstrap.Modal.getInstance(document.getElementById('templateDetailModal')).hide();
+    
+    const modal = new bootstrap.Modal(document.getElementById('applyTemplateModal'));
+    modal.show();
+}
+
+// Preview template changes
+async function previewTemplate() {
+    const agentId = document.getElementById('applyAgentSelect').value;
+    
+    if (!agentId) {
+        showAlert('warning', 'Please select an agent');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/agents/api/templates/${currentTemplate.id}/preview/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ agent_id: agentId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            displayPreview(data.preview);
+            document.getElementById('applyButton').style.display = 'inline-block';
+        } else {
+            showAlert('danger', data.error || 'Failed to preview template');
+        }
+    } catch (error) {
+        console.error('Error previewing template:', error);
+        showAlert('danger', 'Error previewing template');
+    }
+}
+
+// Display preview
+function displayPreview(preview) {
+    let html = '';
+    
+    if (preview.zones_to_configure && preview.zones_to_configure.length > 0) {
+        html += `
+            <div class="preview-group">
+                <h6><i class="fas fa-layer-group"></i> Zones to Configure (${preview.zones_to_configure.length})</h6>
+                ${preview.zones_to_configure.map(zone => 
+                    `<div class="preview-item"><code>${zone}</code> will be configured</div>`
+                ).join('')}
+            </div>
+        `;
+    }
+    
+    if (preview.zones_to_create && preview.zones_to_create.length > 0) {
+        html += `
+            <div class="preview-group">
+                <h6><i class="fas fa-plus-circle"></i> Zones to Create (${preview.zones_to_create.length})</h6>
+                ${preview.zones_to_create.map(zone => 
+                    `<div class="preview-item will-create"><code>${zone}</code> will be created</div>`
+                ).join('')}
+            </div>
+        `;
+    }
+    
+    if (preview.services_to_create && preview.services_to_create.length > 0) {
+        html += `
+            <div class="preview-group">
+                <h6><i class="fas fa-server"></i> Services to Create (${preview.services_to_create.length})</h6>
+                ${preview.services_to_create.map(svc => 
+                    `<div class="preview-item will-create"><code>${svc}</code> will be created</div>`
+                ).join('')}
+            </div>
+        `;
+    }
+    
+    if (preview.policies_to_create && preview.policies_to_create.length > 0) {
+        html += `
+            <div class="preview-group">
+                <h6><i class="fas fa-shield-alt"></i> Policies to Create (${preview.policies_to_create.length})</h6>
+                ${preview.policies_to_create.map(policy => 
+                    `<div class="preview-item will-create"><code>${policy}</code> will be created</div>`
+                ).join('')}
+            </div>
+        `;
+    }
+    
+    if (preview.ipsets_to_create && preview.ipsets_to_create.length > 0) {
+        html += `
+            <div class="preview-group">
+                <h6><i class="fas fa-list"></i> IPSets to Create (${preview.ipsets_to_create.length})</h6>
+                ${preview.ipsets_to_create.map(ipset => 
+                    `<div class="preview-item will-create"><code>${ipset}</code> will be created</div>`
+                ).join('')}
+            </div>
+        `;
+    }
+    
+    document.getElementById('previewContent').innerHTML = html || '<p class="text-muted">No changes to preview</p>';
+    document.getElementById('previewSection').style.display = 'block';
+}
+
+// Apply template
+async function applyTemplate() {
+    const agentId = document.getElementById('applyAgentSelect').value;
+    
+    if (!agentId) {
+        showAlert('warning', 'Please select an agent');
+        return;
+    }
+    
+    // Show progress
+    document.getElementById('applyProgress').style.display = 'block';
+    document.getElementById('applyButton').disabled = true;
+    document.getElementById('previewButton').disabled = true;
+    
+    try {
+        const response = await fetch(`/agents/api/templates/${currentTemplate.id}/apply/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ agent_id: agentId })
+        });
+        
+        const data = await response.json();
+        
+        // Hide progress
+        document.getElementById('applyProgress').style.display = 'none';
+        
+        if (data.success) {
+            displayResults(data.results);
+            showAlert('success', 'Template applied successfully');
+            loadTemplates(); // Refresh to update usage count
+        } else {
+            showAlert('danger', data.error || 'Failed to apply template');
+            document.getElementById('applyButton').disabled = false;
+            document.getElementById('previewButton').disabled = false;
+        }
+    } catch (error) {
+        console.error('Error applying template:', error);
+        document.getElementById('applyProgress').style.display = 'none';
+        document.getElementById('applyButton').disabled = false;
+        document.getElementById('previewButton').disabled = false;
+        showAlert('danger', 'Error applying template');
+    }
+}
+
+// Display results
+function displayResults(results) {
+    const totalSuccess = results.services_created + results.ipsets_created + 
+                        results.zones_configured + results.policies_created;
+    const totalFailed = results.services_failed + results.ipsets_failed + 
+                       results.zones_failed + results.policies_failed;
+    
+    let resultClass = 'success';
+    if (totalFailed > 0) {
+        resultClass = totalSuccess > 0 ? 'partial' : 'error';
+    }
+    
+    let html = `
+        <div class="result-section ${resultClass}">
+            <h6>
+                <i class="fas fa-${resultClass === 'success' ? 'check-circle' : resultClass === 'partial' ? 'exclamation-triangle' : 'times-circle'}"></i>
+                Application Results
+            </h6>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="result-item">
+                        <strong>Services:</strong> ${results.services_created} created, ${results.services_failed} failed
+                    </div>
+                    <div class="result-item">
+                        <strong>IPSets:</strong> ${results.ipsets_created} created, ${results.ipsets_failed} failed
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="result-item">
+                        <strong>Zones:</strong> ${results.zones_configured} configured, ${results.zones_failed} failed
+                    </div>
+                    <div class="result-item">
+                        <strong>Policies:</strong> ${results.policies_created} created, ${results.policies_failed} failed
+                    </div>
+                </div>
+            </div>
+            ${results.errors && results.errors.length > 0 ? `
+                <div class="mt-3">
+                    <strong>Errors:</strong>
+                    <ul class="mb-0">
+                        ${results.errors.map(err => `<li>${err}</li>`).join('')}
+                    </ul>
+                </div>
+            ` : ''}
+        </div>
+    `;
+    
+    document.getElementById('applyResults').innerHTML = html;
+    document.getElementById('applyResults').style.display = 'block';
+}
+
+// Filter event listeners
+document.getElementById('categoryFilter').addEventListener('change', loadTemplates);
+document.getElementById('searchFilter').addEventListener('input', debounce(loadTemplates, 500));
+document.getElementById('globalOnlyFilter').addEventListener('change', function() {
+    const filtered = this.checked ? allTemplates.filter(t => t.is_global) : allTemplates;
+    displayTemplates(filtered);
+});
+
+// Reset filters
+function resetFilters() {
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('searchFilter').value = '';
+    document.getElementById('globalOnlyFilter').checked = false;
+    loadTemplates();
+}
+
+// Utility functions
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showAlert(type, message) {
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    const container = document.querySelector('.container-fluid');
+    container.insertAdjacentHTML('afterbegin', alertHtml);
+    
+    setTimeout(() => {
+        const alert = container.querySelector('.alert');
+        if (alert) {
+            alert.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

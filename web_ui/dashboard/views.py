@@ -83,6 +83,9 @@ def agent_detail(request, agent_id):
     # Only show modules that are enabled globally
     modules_data = []
     
+    # Get agent's installed modules for comparison
+    installed_modules = agent.installed_modules or []
+    
     for module_name in registry.list_module_names():
         module = registry.get(module_name)
         if not module:
@@ -105,10 +108,27 @@ def agent_detail(request, agent_id):
             defaults={'enabled': False, 'available': True}  # Default to available since globally enabled
         )
         
-        # Ensure available is True for globally enabled modules
-        if not agent_module.available:
-            agent_module.available = True
+        # Check if module is installed on agent
+        is_installed = module_name in installed_modules
+        
+        # Update available status based on installation
+        if not is_installed and agent_module.available:
+            agent_module.available = False
+            agent_module.error_message = f"Module package 'tuxsec-agent-{module_name}' not installed"
             agent_module.save()
+        elif is_installed and not agent_module.available:
+            agent_module.available = True
+            agent_module.error_message = ""
+            agent_module.save()
+        
+        # Get module-specific status if the module provides it
+        module_status = None
+        if is_installed and agent_module.enabled and hasattr(module, 'get_module_status'):
+            try:
+                module_status = module.get_module_status(agent)
+            except Exception as e:
+                # Don't fail if status check fails
+                pass
         
         modules_data.append({
             'agent_module': agent_module,
@@ -117,7 +137,9 @@ def agent_detail(request, agent_id):
             'description': module.description,
             'enabled': agent_module.enabled,
             'available': agent_module.available,
+            'installed': is_installed,
             'error_message': agent_module.error_message,
+            'status': module_status,  # Runtime status from module
         })
     
     # Check if firewalld module is enabled for this specific agent

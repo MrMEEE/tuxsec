@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Audit Logs - TuxSec{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-journal-text"></i> Audit Logs</h2>
+            <p class="text-muted">Complete audit trail of all system operations</p>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-funnel"></i> Filters</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" action="{% url 'audit-log-list' %}">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label for="module" class="form-label">Module</label>
+                        <select name="module" id="module" class="form-select">
+                            <option value="">All Modules</option>
+                            {% for mod in modules %}
+                            <option value="{{ mod }}" {% if mod == filters.module %}selected{% endif %}>{{ mod }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="action_category" class="form-label">Action Category</label>
+                        <select name="action_category" id="action_category" class="form-select">
+                            <option value="">All Categories</option>
+                            {% for value, label in action_categories %}
+                            <option value="{{ value }}" {% if value == filters.action_category %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="success" class="form-label">Status</label>
+                        <select name="success" id="success" class="form-select">
+                            <option value="">All</option>
+                            <option value="true" {% if filters.success == 'true' %}selected{% endif %}>Success</option>
+                            <option value="false" {% if filters.success == 'false' %}selected{% endif %}>Failed</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label for="severity" class="form-label">Severity</label>
+                        <select name="severity" id="severity" class="form-select">
+                            <option value="">All</option>
+                            {% for value, label in severity_levels %}
+                            <option value="{{ value }}" {% if value == filters.severity %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> Filter
+                        </button>
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-3">
+                        <label for="user" class="form-label">User</label>
+                        <input type="text" name="user" id="user" class="form-control" value="{{ filters.user }}" placeholder="Username">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="agent" class="form-label">Agent</label>
+                        <input type="text" name="agent" id="agent" class="form-control" value="{{ filters.agent }}" placeholder="Hostname">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="date_from" class="form-label">Date From</label>
+                        <input type="datetime-local" name="date_from" id="date_from" class="form-control" value="{{ filters.date_from }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="date_to" class="form-label">Date To</label>
+                        <input type="datetime-local" name="date_to" id="date_to" class="form-control" value="{{ filters.date_to }}">
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-10">
+                        <label for="q" class="form-label">Search</label>
+                        <input type="text" name="q" id="q" class="form-control" value="{{ filters.q }}" placeholder="Search in descriptions, actions, errors...">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <a href="{% url 'audit-log-list' %}" class="btn btn-secondary w-100">
+                            <i class="bi bi-x-circle"></i> Clear
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Audit Logs Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Audit Entries ({{ page_obj.paginator.count }} total)</h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="5%">Status</th>
+                            <th width="12%">Timestamp</th>
+                            <th width="10%">User</th>
+                            <th width="12%">Agent</th>
+                            <th width="8%">Module</th>
+                            <th width="10%">Action</th>
+                            <th width="8%">Category</th>
+                            <th>Description</th>
+                            <th width="8%">Severity</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in page_obj %}
+                        <tr onclick="window.location.href='{% url 'audit-log-detail' log.id %}'" style="cursor: pointer;">
+                            <td class="text-center">
+                                {% if log.success %}
+                                <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                {% else %}
+                                <i class="bi bi-x-circle-fill text-danger fs-5"></i>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>{{ log.timestamp|date:"Y-m-d H:i:s" }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ log.username }}</span>
+                            </td>
+                            <td>
+                                {% if log.agent_hostname %}
+                                <code>{{ log.agent_hostname }}</code>
+                                {% else %}
+                                <span class="text-muted">System</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ log.module }}</span>
+                            </td>
+                            <td>
+                                <code class="small">{{ log.action }}</code>
+                            </td>
+                            <td>
+                                {% if log.action_category == 'read' %}
+                                <span class="badge bg-secondary">{{ log.get_action_category_display }}</span>
+                                {% elif log.action_category == 'create' %}
+                                <span class="badge bg-success">{{ log.get_action_category_display }}</span>
+                                {% elif log.action_category == 'update' %}
+                                <span class="badge bg-primary">{{ log.get_action_category_display }}</span>
+                                {% elif log.action_category == 'delete' %}
+                                <span class="badge bg-danger">{{ log.get_action_category_display }}</span>
+                                {% else %}
+                                <span class="badge bg-dark">{{ log.get_action_category_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <small>{{ log.description|truncatewords:15 }}</small>
+                            </td>
+                            <td>
+                                {% if log.severity == 'critical' %}
+                                <span class="badge bg-danger">{{ log.get_severity_display }}</span>
+                                {% elif log.severity == 'warning' %}
+                                <span class="badge bg-warning text-dark">{{ log.get_severity_display }}</span>
+                                {% else %}
+                                <span class="badge bg-info">{{ log.get_severity_display }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-5">
+                                <i class="bi bi-inbox fs-1"></i>
+                                <p class="mt-2">No audit logs found matching your criteria</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Audit logs pagination" class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1{% if filters.module %}&module={{ filters.module }}{% endif %}{% if filters.action_category %}&action_category={{ filters.action_category }}{% endif %}{% if filters.success %}&success={{ filters.success }}{% endif %}{% if filters.severity %}&severity={{ filters.severity }}{% endif %}{% if filters.user %}&user={{ filters.user }}{% endif %}{% if filters.agent %}&agent={{ filters.agent }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">First</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if filters.module %}&module={{ filters.module }}{% endif %}{% if filters.action_category %}&action_category={{ filters.action_category }}{% endif %}{% if filters.success %}&success={{ filters.success }}{% endif %}{% if filters.severity %}&severity={{ filters.severity }}{% endif %}{% if filters.user %}&user={{ filters.user }}{% endif %}{% if filters.agent %}&agent={{ filters.agent }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">Previous</a>
+            </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+            </li>
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if filters.module %}&module={{ filters.module }}{% endif %}{% if filters.action_category %}&action_category={{ filters.action_category }}{% endif %}{% if filters.success %}&success={{ filters.success }}{% endif %}{% if filters.severity %}&severity={{ filters.severity }}{% endif %}{% if filters.user %}&user={{ filters.user }}{% endif %}{% if filters.agent %}&agent={{ filters.agent }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">Next</a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if filters.module %}&module={{ filters.module }}{% endif %}{% if filters.action_category %}&action_category={{ filters.action_category }}{% endif %}{% if filters.success %}&success={{ filters.success }}{% endif %}{% if filters.severity %}&severity={{ filters.severity }}{% endif %}{% if filters.user %}&user={{ filters.user }}{% endif %}{% if filters.agent %}&agent={{ filters.agent }}{% endif %}{% if filters.q %}&q={{ filters.q }}{% endif %}">Last</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+{% endblock %}

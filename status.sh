@@ -34,6 +34,9 @@ fi
 if pgrep -f "sync_agents --daemon" > /dev/null 2>&1; then
     pid=$(pgrep -f "sync_agents --daemon")
     echo -e "${GREEN}✓ Sync Agents Scheduler: Running${NC} (PID: $pid)"
+    if [ -f "web_ui/logs/sync.log" ]; then
+        echo -e "${BLUE}  Log file: web_ui/logs/sync.log${NC}"
+    fi
 else
     echo -e "${RED}✗ Sync Agents Scheduler: Not running${NC}"
 fi

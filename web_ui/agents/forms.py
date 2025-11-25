@@ -116,9 +116,9 @@ class AgentForm(forms.ModelForm):
                     "Either SSH private key or SSH password is required for SSH connections."
                 )
             
-            # Test SSH connection
-            if ssh_private_key or ssh_password_input or not self.instance.pk:
-                # Only test if key/password changed or creating new agent
+            # Test SSH connection only if credentials are provided
+            if ssh_private_key or ssh_password_input:
+                # Only test if key/password provided
                 test_result = self._test_ssh_connection(
                     cleaned_data.get('ip_address'),
                     cleaned_data.get('port', 22),

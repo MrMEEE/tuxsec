@@ -90,12 +90,21 @@ else
     fi
 fi
 
-# Start Sync Agents Scheduler
-start_component \
-    "Sync Agents Scheduler" \
-    "sync_agents --daemon" \
-    "cd ${SCRIPT_DIR}/web_ui && ${VENV_PYTHON} manage.py sync_agents --daemon" \
-    2
+# Start Sync Agents Scheduler with logging
+if is_running "sync_agents --daemon"; then
+    echo -e "${YELLOW}⚠ Sync Agents Scheduler is already running${NC}"
+else
+    echo -e "${GREEN}▶ Starting Sync Agents Scheduler...${NC}"
+    mkdir -p "${SCRIPT_DIR}/web_ui/logs"
+    nohup bash -c "cd ${SCRIPT_DIR}/web_ui && ${VENV_PYTHON} -u manage.py sync_agents --daemon --interval 5 2>&1 | tee logs/sync.log" > /dev/null 2>&1 &
+    sleep 2
+    if is_running "sync_agents --daemon"; then
+        echo -e "${GREEN}✓ Sync Agents Scheduler started successfully${NC}"
+        echo -e "${BLUE}  Log file: web_ui/logs/sync.log${NC}"
+    else
+        echo -e "${RED}✗ Failed to start Sync Agents Scheduler${NC}"
+    fi
+fi
 
 echo
 echo -e "${BLUE}================================${NC}"

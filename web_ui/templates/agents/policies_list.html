@@ -1,0 +1,463 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Firewall Policies - {{ agent.hostname }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.policy-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    transition: box-shadow 0.2s;
+}
+.policy-card:hover {
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+.policy-matrix {
+    overflow-x: auto;
+}
+.matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+.matrix-table th, .matrix-table td {
+    border: 1px solid #dee2e6;
+    padding: 0.75rem;
+    text-align: center;
+}
+.matrix-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+.policy-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+.policy-badge.accept { background-color: #d4edda; color: #155724; }
+.policy-badge.reject { background-color: #f8d7da; color: #721c24; }
+.policy-badge.drop { background-color: #d6d8db; color: #383d41; }
+.policy-badge.continue { background-color: #d1ecf1; color: #0c5460; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard:agent-list' %}">Agents</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard:agent-detail' agent.id %}">{{ agent.hostname }}</a></li>
+                    <li class="breadcrumb-item active">Policies</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-shield-alt me-2"></i>Firewall Policies</h2>
+            <p class="text-muted">Zone-to-zone traffic control policies for {{ agent.hostname }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <button class="btn btn-success" onclick="showCreatePolicyModal()">
+                <i class="fas fa-plus me-1"></i>Create Policy
+            </button>
+        </div>
+    </div>
+
+    <!-- Policies List -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-list me-2"></i>Policies (<span id="policy-count">0</span>)</h5>
+                    <div class="input-group" style="width: 300px;">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search policies...">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="policies-list">
+                        <div class="text-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Policy Matrix View -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-th me-2"></i>Policy Matrix</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Visual representation of zone-to-zone policies</p>
+                    <div class="policy-matrix" id="policy-matrix">
+                        <div class="text-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Policy Modal -->
+<div class="modal fade" id="createPolicyModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus-circle me-2"></i>Create Policy</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createPolicyForm">
+                    <div class="mb-3">
+                        <label for="policyName" class="form-label">Policy Name</label>
+                        <input type="text" class="form-control" id="policyName" required 
+                               pattern="[a-zA-Z0-9_-]+" 
+                               placeholder="e.g., dmz-to-internal">
+                        <small class="form-text text-muted">Only letters, numbers, hyphens, and underscores</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="policyDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="policyDescription" rows="2" 
+                                  placeholder="Optional description"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ingressZone" class="form-label">Ingress Zone (From)</label>
+                        <select class="form-select" id="ingressZone" required>
+                            <option value="">Select ingress zone...</option>
+                        </select>
+                        <small class="form-text text-muted">Traffic coming from this zone</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="egressZone" class="form-label">Egress Zone (To)</label>
+                        <select class="form-select" id="egressZone" required>
+                            <option value="">Select egress zone...</option>
+                        </select>
+                        <small class="form-text text-muted">Traffic going to this zone</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="policyTarget" class="form-label">Target Action</label>
+                        <select class="form-select" id="policyTarget" required>
+                            <option value="ACCEPT">ACCEPT - Allow traffic</option>
+                            <option value="REJECT">REJECT - Block and notify</option>
+                            <option value="DROP">DROP - Block silently</option>
+                            <option value="CONTINUE" selected>CONTINUE - Use zone defaults</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="createPolicy()">
+                    <i class="fas fa-plus me-1"></i>Create
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Policy Detail Modal -->
+<div class="modal fade" id="policyDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-info-circle me-2"></i>Policy Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="policyDetailContent">
+                <!-- Populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const agentId = '{{ agent.id }}';
+let policies = [];
+let zones = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadZones();
+    loadPolicies();
+    
+    // Search functionality
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        filterPolicies(searchTerm);
+    });
+});
+
+function loadZones() {
+    // Load zones for dropdowns
+    fetch(`/agents/${agentId}/zones-data/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.zones) {
+                zones = data.zones;
+                populateZoneDropdowns();
+            }
+        })
+        .catch(error => {
+            console.error('Error loading zones:', error);
+        });
+}
+
+function populateZoneDropdowns() {
+    const ingressSelect = document.getElementById('ingressZone');
+    const egressSelect = document.getElementById('egressZone');
+    
+    zones.forEach(zone => {
+        ingressSelect.add(new Option(zone.name, zone.name));
+        egressSelect.add(new Option(zone.name, zone.name));
+    });
+}
+
+function loadPolicies() {
+    fetch(`/agents/${agentId}/policies/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                policies = data.data.policies || [];
+                renderPolicies();
+                renderPolicyMatrix();
+                document.getElementById('policy-count').textContent = policies.length;
+            } else {
+                showError(`Failed to load policies: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            showError(`Error loading policies: ${error.message}`);
+        });
+}
+
+function renderPolicies() {
+    const container = document.getElementById('policies-list');
+    
+    if (policies.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No policies configured. Create a policy to control zone-to-zone traffic.</div>';
+        return;
+    }
+    
+    let html = '';
+    policies.forEach(policyName => {
+        // Fetch policy details
+        fetch(`/agents/${agentId}/policies/${policyName}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const policy = data.data.policy;
+                    const targetClass = (policy.target || 'CONTINUE').toLowerCase();
+                    
+                    html += `
+                        <div class="policy-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h5>${policy.name}</h5>
+                                    <div class="mb-2">
+                                        <span class="badge bg-primary me-2">From: ${policy.ingress_zones || 'ANY'}</span>
+                                        <span class="badge bg-info">To: ${policy.egress_zones || 'ANY'}</span>
+                                    </div>
+                                    <span class="policy-badge ${targetClass}">${policy.target || 'CONTINUE'}</span>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary me-1" onclick="showPolicyDetail('${policy.name}')">
+                                        <i class="fas fa-info-circle"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deletePolicy('${policy.name}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.innerHTML = html;
+                }
+            });
+    });
+}
+
+function renderPolicyMatrix() {
+    const container = document.getElementById('policy-matrix');
+    
+    if (zones.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">Load zones to view policy matrix</div>';
+        return;
+    }
+    
+    let html = '<table class="matrix-table"><thead><tr><th>From \\ To</th>';
+    zones.forEach(zone => {
+        html += `<th>${zone.name}</th>`;
+    });
+    html += '</tr></thead><tbody>';
+    
+    zones.forEach(fromZone => {
+        html += `<tr><th>${fromZone.name}</th>`;
+        zones.forEach(toZone => {
+            // Check if policy exists
+            const policyAction = getPolicyAction(fromZone.name, toZone.name);
+            const actionClass = policyAction.toLowerCase();
+            html += `<td><span class="policy-badge ${actionClass}">${policyAction}</span></td>`;
+        });
+        html += '</tr>';
+    });
+    
+    html += '</tbody></table>';
+    container.innerHTML = html;
+}
+
+function getPolicyAction(fromZone, toZone) {
+    // TODO: Implement actual policy lookup
+    // For now, return default
+    if (fromZone === toZone) return 'ACCEPT';
+    return 'CONTINUE';
+}
+
+function filterPolicies(searchTerm) {
+    const cards = document.querySelectorAll('.policy-card');
+    cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        card.style.display = text.includes(searchTerm) ? 'block' : 'none';
+    });
+}
+
+function showCreatePolicyModal() {
+    const modal = new bootstrap.Modal(document.getElementById('createPolicyModal'));
+    document.getElementById('createPolicyForm').reset();
+    modal.show();
+}
+
+function createPolicy() {
+    const name = document.getElementById('policyName').value.trim();
+    const description = document.getElementById('policyDescription').value.trim();
+    const ingressZone = document.getElementById('ingressZone').value;
+    const egressZone = document.getElementById('egressZone').value;
+    const target = document.getElementById('policyTarget').value;
+    
+    if (!name || !ingressZone || !egressZone) {
+        showError('Please fill in all required fields');
+        return;
+    }
+    
+    fetch(`/agents/${agentId}/policies/create/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name: name,
+            description: description,
+            ingress_zone: ingressZone,
+            egress_zone: egressZone,
+            target: target
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess(data.message);
+            bootstrap.Modal.getInstance(document.getElementById('createPolicyModal')).hide();
+            loadPolicies();
+        } else {
+            showError(data.error);
+        }
+    })
+    .catch(error => {
+        showError(`Error: ${error.message}`);
+    });
+}
+
+function showPolicyDetail(policyName) {
+    fetch(`/agents/${agentId}/policies/${policyName}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const policy = data.data.policy;
+                let html = `
+                    <div class="mb-3">
+                        <strong>Name:</strong> ${policy.name}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Ingress Zones:</strong> 
+                        <span class="badge bg-primary">${policy.ingress_zones || 'ANY'}</span>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Egress Zones:</strong> 
+                        <span class="badge bg-info">${policy.egress_zones || 'ANY'}</span>
+                    </div>
+                    <div class="mb-3">
+                        <strong>Target:</strong> 
+                        <span class="policy-badge ${(policy.target || '').toLowerCase()}">${policy.target || 'CONTINUE'}</span>
+                    </div>
+                `;
+                document.getElementById('policyDetailContent').innerHTML = html;
+                const modal = new bootstrap.Modal(document.getElementById('policyDetailModal'));
+                modal.show();
+            } else {
+                showError(data.error);
+            }
+        })
+        .catch(error => {
+            showError(`Error: ${error.message}`);
+        });
+}
+
+function deletePolicy(policyName) {
+    if (!confirm(`Are you sure you want to delete policy "${policyName}"?`)) {
+        return;
+    }
+    
+    fetch(`/agents/${agentId}/policies/${policyName}/delete/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess(data.message);
+            loadPolicies();
+        } else {
+            showError(data.error);
+        }
+    })
+    .catch(error => {
+        showError(`Error: ${error.message}`);
+    });
+}
+
+function showSuccess(message) {
+    // Use existing notification system or simple alert
+    alert(message);
+}
+
+function showError(message) {
+    alert('Error: ' + message);
+}
+</script>
+{% endblock %}

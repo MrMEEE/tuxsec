@@ -1,9 +1,10 @@
-#!/usr/bin/env python3
-"""
-TuxSec Root Daemon (tuxsec-rootd)
+c Root Daemon (tuxsec-rootd)
+s root and exposes system management capabilities through
 
-This daemon runs as root and exposes system management capabilities through
-a Unix socket. It uses a modular architecture where each module provides
+
+
+
+ socket. It uses a modular architecture where each module provides
 specific functionality (firewalld, SELinux, AIDE, etc.).
 
 Security features:

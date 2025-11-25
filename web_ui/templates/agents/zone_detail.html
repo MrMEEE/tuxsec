@@ -1,0 +1,771 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Zone: {{ zone.name }} - {{ agent.hostname }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'dashboard:home' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'agent-detail' agent.id %}">{{ agent.hostname }}</a></li>
+            <li class="breadcrumb-item active">Zone: {{ zone.name }}</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>
+            <i class="fas fa-shield-alt me-2 text-primary"></i>
+            Zone: <strong>{{ zone.name }}</strong>
+        </h2>
+        <div>
+            <button class="btn btn-primary me-2" onclick="setDefaultZone('{{ zone.name }}')">
+                <i class="fas fa-star me-1"></i>Set as Default
+            </button>
+            <button class="btn btn-danger" onclick="deleteZone('{{ zone.id }}', '{{ zone.name }}')">
+                <i class="fas fa-trash me-1"></i>Delete Zone
+            </button>
+        </div>
+    </div>
+
+    <!-- Zone Information Card -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <h6 class="text-muted mb-1">Agent</h6>
+                    <p class="mb-0">{{ agent.hostname }}</p>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="text-muted mb-1">Target Policy</h6>
+                    <p class="mb-0"><span class="badge bg-info">{{ zone.target|default:"default" }}</span></p>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="text-muted mb-1">Masquerade</h6>
+                    <p class="mb-0">
+                        {% if zone.masquerade %}
+                            <span class="badge bg-warning"><i class="fas fa-check me-1"></i>Enabled</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>Disabled</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="col-md-3">
+                    <h6 class="text-muted mb-1">Forward</h6>
+                    <p class="mb-0">
+                        {% if zone.forward %}
+                            <span class="badge bg-success"><i class="fas fa-check me-1"></i>Enabled</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="fas fa-times me-1"></i>Disabled</span>
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            {% if zone.description %}
+            <div class="mt-3">
+                <h6 class="text-muted mb-1">Description</h6>
+                <p class="mb-0">{{ zone.description }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tabbed Interface -->
+    <div class="card">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="basic-tab" data-bs-toggle="tab" data-bs-target="#basic" type="button" role="tab">
+                        <i class="fas fa-list me-1"></i>Basic
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="advanced-tab" data-bs-toggle="tab" data-bs-target="#advanced" type="button" role="tab">
+                        <i class="fas fa-cogs me-1"></i>Advanced
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="forwarding-tab" data-bs-toggle="tab" data-bs-target="#forwarding" type="button" role="tab">
+                        <i class="fas fa-exchange-alt me-1"></i>Forwarding
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="rich-rules-tab" data-bs-toggle="tab" data-bs-target="#rich-rules" type="button" role="tab">
+                        <i class="fas fa-code me-1"></i>Rich Rules
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings" type="button" role="tab">
+                        <i class="fas fa-sliders-h me-1"></i>Settings
+                    </button>
+                </li>
+            </ul>
+        </div>
+        <div class="card-body">
+            <div class="tab-content">
+                <!-- Basic Tab -->
+                <div class="tab-pane fade show active" id="basic" role="tabpanel">
+                    <div class="row">
+                        <!-- Services -->
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5><i class="fas fa-server me-2"></i>Services</h5>
+                                <button class="btn btn-sm btn-success" onclick="showAddServiceModal('{{ zone.id }}', '{{ zone.name }}')">
+                                    <i class="fas fa-plus me-1"></i>Add Service
+                                </button>
+                            </div>
+                            <div class="list-group" id="services-list">
+                                {% if zone.services %}
+                                    {% for service in zone.services %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span><i class="fas fa-plug me-2 text-primary"></i>{{ service }}</span>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeService('{{ zone.id }}', '{{ service }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-info">No services configured</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Ports -->
+                        <div class="col-md-6">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5><i class="fas fa-door-open me-2"></i>Ports</h5>
+                                <button class="btn btn-sm btn-success" onclick="showAddPortModal('{{ zone.id }}', '{{ zone.name }}')">
+                                    <i class="fas fa-plus me-1"></i>Add Port
+                                </button>
+                            </div>
+                            <div class="list-group" id="ports-list">
+                                {% if zone.ports %}
+                                    {% for port in zone.ports %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span><i class="fas fa-network-wired me-2 text-success"></i>{{ port }}</span>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removePort('{{ zone.id }}', '{{ port }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-info">No ports configured</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Tab -->
+                <div class="tab-pane fade" id="advanced" role="tabpanel">
+                    <div class="row">
+                        <!-- Protocols -->
+                        <div class="col-md-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5><i class="fas fa-network-wired me-2"></i>Protocols</h5>
+                                <button class="btn btn-sm btn-success" onclick="showAddProtocolModal()">
+                                    <i class="fas fa-plus me-1"></i>Add
+                                </button>
+                            </div>
+                            <div class="list-group" id="protocols-list">
+                                {% if zone.protocols %}
+                                    {% for protocol in zone.protocols %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{{ protocol }}</span>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeProtocol('{{ protocol }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-info">No protocols configured</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Source Ports -->
+                        <div class="col-md-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5><i class="fas fa-sign-in-alt me-2"></i>Source Ports</h5>
+                                <button class="btn btn-sm btn-success" onclick="showAddSourcePortModal()">
+                                    <i class="fas fa-plus me-1"></i>Add
+                                </button>
+                            </div>
+                            <div class="list-group" id="source-ports-list">
+                                {% if zone.source_ports %}
+                                    {% for port in zone.source_ports %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{{ port }}</span>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeSourcePort('{{ port }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-info">No source ports configured</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- ICMP Blocks -->
+                        <div class="col-md-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5><i class="fas fa-ban me-2"></i>ICMP Blocks</h5>
+                                <button class="btn btn-sm btn-success" onclick="showAddICMPBlockModal()">
+                                    <i class="fas fa-plus me-1"></i>Add
+                                </button>
+                            </div>
+                            <div class="list-group" id="icmp-blocks-list">
+                                {% if zone.icmp_blocks %}
+                                    {% for icmp_type in zone.icmp_blocks %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{{ icmp_type }}</span>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeICMPBlock('{{ icmp_type }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-info">No ICMP blocks configured</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Helper Modules -->
+                        <div class="col-md-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5><i class="fas fa-plug me-2"></i>Helper Modules</h5>
+                                <button class="btn btn-sm btn-success" onclick="showAddHelperModal()">
+                                    <i class="fas fa-plus me-1"></i>Add
+                                </button>
+                            </div>
+                            <div class="list-group" id="helpers-list">
+                                {% if zone.helpers %}
+                                    {% for helper in zone.helpers %}
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span>{{ helper }}</span>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="removeHelper('{{ helper }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div class="alert alert-info">No helper modules configured</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Forwarding Tab -->
+                <div class="tab-pane fade" id="forwarding" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5><i class="fas fa-share me-2"></i>Port Forwarding Rules</h5>
+                        <button class="btn btn-sm btn-success" onclick="showAddForwardPortModal()">
+                            <i class="fas fa-plus me-1"></i>Add Forwarding Rule
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Port</th>
+                                    <th>Protocol</th>
+                                    <th>To Port</th>
+                                    <th>To Address</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="forward-rules-list">
+                                {% if zone.forward_ports %}
+                                    {% for forward in zone.forward_ports %}
+                                    <tr>
+                                        <td>{{ forward.port }}</td>
+                                        <td><span class="badge bg-secondary">{{ forward.protocol }}</span></td>
+                                        <td>{{ forward.to_port|default:"-" }}</td>
+                                        <td>{{ forward.to_addr|default:"-" }}</td>
+                                        <td>
+                                            <button class="btn btn-sm btn-outline-danger" onclick="removeForwardPort('{{ forward.port }}', '{{ forward.protocol }}', '{{ forward.to_port }}', '{{ forward.to_addr }}')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                {% else %}
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted">No forwarding rules configured</td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Rich Rules Tab -->
+                <div class="tab-pane fade" id="rich-rules" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5><i class="fas fa-code me-2"></i>Rich Rules</h5>
+                        <button class="btn btn-sm btn-success" onclick="showAddRichRuleModal()">
+                            <i class="fas fa-plus me-1"></i>Add Rich Rule
+                        </button>
+                    </div>
+                    <div class="list-group" id="rich-rules-list">
+                        {% if zone.rich_rules %}
+                            {% for rule in zone.rich_rules %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <code class="flex-grow-1">{{ rule }}</code>
+                                    <button class="btn btn-sm btn-outline-danger ms-2" onclick="removeRichRule('{{ rule|escapejs }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="alert alert-info">No rich rules configured</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Settings Tab -->
+                <div class="tab-pane fade" id="settings" role="tabpanel">
+                    <h5 class="mb-4"><i class="fas fa-sliders-h me-2"></i>Zone Settings</h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-mask me-2"></i>Masquerading</h6>
+                                    <p class="card-text text-muted small">Enable NAT masquerading for outgoing connections</p>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="masqueradeSwitch" {% if zone.masquerade %}checked{% endif %} onchange="toggleMasquerade(this.checked)">
+                                        <label class="form-check-label" for="masqueradeSwitch">
+                                            {% if zone.masquerade %}Enabled{% else %}Disabled{% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-arrows-alt-h me-2"></i>Forwarding</h6>
+                                    <p class="card-text text-muted small">Allow forwarding of packets between interfaces</p>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="forwardSwitch" {% if zone.forward %}checked{% endif %} onchange="toggleForward(this.checked)">
+                                        <label class="form-check-label" for="forwardSwitch">
+                                            {% if zone.forward %}Enabled{% else %}Disabled{% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-file-alt me-2"></i>Log Denied Packets</h6>
+                                    <p class="card-text text-muted small">Configure logging of packets denied by firewall</p>
+                                    <select class="form-select" id="logDeniedSelect" onchange="changeLogDenied(this.value)">
+                                        <option value="">Loading...</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-2">
+                                        <i class="fas fa-info-circle"></i> Logs appear in /var/log/messages or journalctl
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-shield-alt me-2"></i>Target Policy</h6>
+                                    <p class="card-text text-muted small">Default action for packets not matching any rule</p>
+                                    <select class="form-select" id="targetSelect" onchange="changeTarget(this.value)">
+                                        <option value="default" {% if zone.target == "default" %}selected{% endif %}>default</option>
+                                        <option value="ACCEPT" {% if zone.target == "ACCEPT" %}selected{% endif %}>ACCEPT</option>
+                                        <option value="DROP" {% if zone.target == "DROP" %}selected{% endif %}>DROP</option>
+                                        <option value="%%REJECT%%" {% if zone.target == "%%REJECT%%" %}selected{% endif %}>REJECT</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title"><i class="fas fa-ban me-2"></i>ICMP Block Inversion</h6>
+                                    <p class="card-text text-muted small">Invert ICMP blocks (block all except specified)</p>
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="icmpInversionSwitch" {% if zone.icmp_block_inversion %}checked{% endif %} onchange="toggleICMPInversion(this.checked)">
+                                        <label class="form-check-label" for="icmpInversionSwitch">
+                                            {% if zone.icmp_block_inversion %}Enabled{% else %}Disabled{% endif %}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% csrf_token %}
+
+<script>
+// Placeholder functions - these will be connected to actual API calls
+function setDefaultZone(zoneName) {
+    console.log('Set default zone:', zoneName);
+    // Will be implemented with AJAX call
+}
+
+function deleteZone(zoneId, zoneName) {
+    if (confirm(`Delete zone ${zoneName}?`)) {
+        window.location.href = `/agents/{{ agent.id }}/zone/${zoneId}/delete/`;
+    }
+}
+
+function showAddServiceModal(zoneId, zoneName) {
+    console.log('Add service to zone:', zoneId);
+    // Will show modal for adding service
+}
+
+function removeService(zoneId, service) {
+    if (confirm(`Remove service ${service}?`)) {
+        // AJAX call to remove service
+    }
+}
+
+function showAddPortModal(zoneId, zoneName) {
+    console.log('Add port to zone:', zoneId);
+    // Will show modal for adding port
+}
+
+function removePort(zoneId, port) {
+    if (confirm(`Remove port ${port}?`)) {
+        // AJAX call to remove port
+    }
+}
+
+function toggleMasquerade(enabled) {
+    console.log('Toggle masquerade:', enabled);
+    // AJAX call to toggle masquerade
+}
+
+function toggleForward(enabled) {
+    console.log('Toggle forward:', enabled);
+    // AJAX call to toggle forward
+}
+
+function changeTarget(target) {
+    console.log('Change target:', target);
+    // AJAX call to change target
+}
+
+function toggleICMPInversion(enabled) {
+    const agentId = '{{ agent.id }}';
+    const zoneId = '{{ zone.id }}';
+    
+    fetch(`/agents/${agentId}/zone/${zoneId}/icmp-inversion/toggle/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled: enabled })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess(data.message);
+        } else {
+            showError(data.error);
+            // Revert checkbox on error
+            document.getElementById('icmpInversionSwitch').checked = !enabled;
+        }
+    })
+    .catch(error => {
+        showError(`Error: ${error.message}`);
+        // Revert checkbox on error
+        document.getElementById('icmpInversionSwitch').checked = !enabled;
+    });
+}
+
+// Additional placeholder functions for Advanced tab
+function showAddProtocolModal() { console.log('Add protocol'); }
+function removeProtocol(protocol) { console.log('Remove protocol:', protocol); }
+function showAddSourcePortModal() { console.log('Add source port'); }
+function removeSourcePort(port) { console.log('Remove source port:', port); }
+
+function showAddHelperModal() {
+    const agentId = '{{ agent.id }}';
+    
+    // Fetch available helper modules
+    fetch(`/agents/${agentId}/helpers/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const helpers = data.data.helpers;
+                
+                // Create modal content
+                let optionsHtml = '';
+                helpers.forEach(helper => {
+                    optionsHtml += `<option value="${helper}">${helper}</option>`;
+                });
+                
+                const modalContent = `
+                    <div class="form-group">
+                        <label for="helperSelect">Helper Module:</label>
+                        <select class="form-control" id="helperSelect">
+                            ${optionsHtml}
+                        </select>
+                        <small class="form-text text-muted">
+                            Connection tracking helpers for protocols like FTP, TFTP, SIP, etc.
+                        </small>
+                    </div>
+                `;
+                
+                showModal('Add Helper Module', modalContent, function() {
+                    const selectedHelper = document.getElementById('helperSelect').value;
+                    addHelper(selectedHelper);
+                });
+            } else {
+                showError(`Failed to load helper modules: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            showError(`Error loading helper modules: ${error.message}`);
+        });
+}
+
+function addHelper(helper) {
+    const agentId = '{{ agent.id }}';
+    const zoneId = '{{ zone.id }}';
+    
+    fetch(`/agents/${agentId}/zone/${zoneId}/helper/add/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ helper: helper, permanent: true })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess(data.message);
+            location.reload();
+        } else {
+            showError(data.error);
+        }
+    })
+    .catch(error => {
+        showError(`Error: ${error.message}`);
+    });
+}
+
+function removeHelper(helper) {
+    const agentId = '{{ agent.id }}';
+    const zoneId = '{{ zone.id }}';
+    
+    showConfirm(`Remove helper module <strong>${helper}</strong>?`, function() {
+        fetch(`/agents/${agentId}/zone/${zoneId}/helper/${encodeURIComponent(helper)}/remove/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ permanent: true })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(data.message);
+                location.reload();
+            } else {
+                showError(data.error);
+            }
+        })
+        .catch(error => {
+            showError(`Error: ${error.message}`);
+        });
+    });
+}
+
+function showAddICMPBlockModal() {
+    const agentId = '{{ agent.id }}';
+    
+    // Fetch available ICMP types
+    fetch(`/agents/${agentId}/icmptypes/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const icmptypes = data.icmptypes;
+                
+                // Create modal content
+                let optionsHtml = '';
+                icmptypes.forEach(type => {
+                    optionsHtml += `<option value="${type}">${type}</option>`;
+                });
+                
+                const modalContent = `
+                    <div class="form-group">
+                        <label for="icmpTypeSelect">ICMP Type:</label>
+                        <select class="form-control" id="icmpTypeSelect">
+                            ${optionsHtml}
+                        </select>
+                    </div>
+                `;
+                
+                showModal('Add ICMP Block', modalContent, function() {
+                    const selectedType = document.getElementById('icmpTypeSelect').value;
+                    addICMPBlock(selectedType);
+                });
+            } else {
+                showError(`Failed to load ICMP types: ${data.error}`);
+            }
+        })
+        .catch(error => {
+            showError(`Error loading ICMP types: ${error.message}`);
+        });
+}
+
+function addICMPBlock(icmpType) {
+    const agentId = '{{ agent.id }}';
+    const zoneId = '{{ zone.id }}';
+    
+    fetch(`/agents/${agentId}/zone/${zoneId}/icmp-block/add/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ icmp_type: icmpType })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess(data.message);
+        } else {
+            showError(data.error);
+        }
+    })
+    .catch(error => {
+        showError(`Error: ${error.message}`);
+    });
+}
+
+function removeICMPBlock(icmpType) {
+    const agentId = '{{ agent.id }}';
+    const zoneId = '{{ zone.id }}';
+    
+    showConfirm(`Remove ICMP block for type <strong>${icmpType}</strong>?`, function() {
+        fetch(`/agents/${agentId}/zone/${zoneId}/icmp-block/${icmpType}/remove/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showSuccess(data.message);
+            } else {
+                showError(data.error);
+            }
+        })
+        .catch(error => {
+            showError(`Error: ${error.message}`);
+        });
+    });
+}
+
+// Forwarding tab functions
+function showAddForwardPortModal() { console.log('Add forward port'); }
+function removeForwardPort(port, protocol, toPort, toAddr) { console.log('Remove forward port'); }
+
+// Rich Rules tab functions
+function showAddRichRuleModal() { console.log('Add rich rule'); }
+function removeRichRule(rule) { console.log('Remove rich rule:', rule); }
+
+// Log denied packets functions
+function loadLogDeniedStatus() {
+    const agentId = '{{ agent.id }}';
+    const select = document.getElementById('logDeniedSelect');
+    
+    fetch(`/agents/${agentId}/log-denied/status/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const currentValue = data.data.log_denied;
+                
+                // Populate select with options
+                select.innerHTML = `
+                    <option value="off" ${currentValue === 'off' ? 'selected' : ''}>Off (No logging)</option>
+                    <option value="all" ${currentValue === 'all' ? 'selected' : ''}>All (Log all denied packets)</option>
+                    <option value="unicast" ${currentValue === 'unicast' ? 'selected' : ''}>Unicast only</option>
+                    <option value="broadcast" ${currentValue === 'broadcast' ? 'selected' : ''}>Broadcast only</option>
+                    <option value="multicast" ${currentValue === 'multicast' ? 'selected' : ''}>Multicast only</option>
+                `;
+            } else {
+                select.innerHTML = '<option value="">Error loading status</option>';
+                showError(data.error || 'Failed to load log denied status');
+            }
+        })
+        .catch(error => {
+            select.innerHTML = '<option value="">Error loading</option>';
+            console.error('Error loading log denied status:', error);
+        });
+}
+
+function changeLogDenied(value) {
+    if (!value) return; // Skip empty/loading state
+    
+    const agentId = '{{ agent.id }}';
+    
+    fetch(`/agents/${agentId}/log-denied/control/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ value: value })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showSuccess(data.message);
+        } else {
+            showError(data.error);
+            // Reload status to revert select on error
+            loadLogDeniedStatus();
+        }
+    })
+    .catch(error => {
+        showError(`Error: ${error.message}`);
+        // Reload status to revert select on error
+        loadLogDeniedStatus();
+    });
+}
+
+// Load log denied status when Settings tab is shown
+document.addEventListener('DOMContentLoaded', function() {
+    const settingsTab = document.getElementById('settings-tab');
+    if (settingsTab) {
+        settingsTab.addEventListener('shown.bs.tab', function() {
+            loadLogDeniedStatus();
+        });
+        
+        // Also load immediately if Settings tab is already active
+        if (settingsTab.classList.contains('active')) {
+            loadLogDeniedStatus();
+        }
+    }
+});
+</script>
+
+{% endblock %}

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCommand
+from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCommand, AuditLog
 
 
 @admin.register(Agent)
@@ -37,3 +37,27 @@ class AgentCommandAdmin(admin.ModelAdmin):
     list_filter = ['command_type', 'status', 'created_at']
     search_fields = ['agent__hostname', 'command_type']
     readonly_fields = ['id', 'created_at', 'executed_at', 'completed_at']
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ['timestamp', 'username', 'agent_hostname', 'module', 'action', 'success', 'severity', 'action_category']
+    list_filter = ['module', 'action_category', 'success', 'severity', 'timestamp']
+    search_fields = ['username', 'agent_hostname', 'module', 'action', 'description']
+    readonly_fields = ['id', 'timestamp', 'user', 'username', 'ip_address', 'agent', 'agent_hostname', 
+                      'module', 'action', 'action_category', 'params', 'result', 'success', 
+                      'error_message', 'description', 'severity', 'command', 'before_state', 
+                      'after_state', 'session_id', 'tags']
+    date_hierarchy = 'timestamp'
+    
+    def has_add_permission(self, request):
+        # Audit logs should only be created programmatically
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        # Audit logs are immutable
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        # Only superusers can delete audit logs
+        return request.user.is_superuser
