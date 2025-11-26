@@ -728,7 +728,7 @@ class FirewalldModule(BaseModule):
             Dict with success message
         """
         from agents.connection_managers import get_connection_manager
-        from agents.models import FirewallZone, FirewallRule
+        from modules.firewalld.models import FirewallZone, FirewallRule
         from django.db import transaction
         import asyncio
         import threading

@@ -6,7 +6,8 @@ from django.views.decorators.http import require_http_methods
 import json
 from datetime import datetime, timedelta
 
-from agents.models import Agent, AgentConnection, FirewallRule, AgentCommand
+from agents.models import Agent, AgentConnection, AgentCommand
+from modules.firewalld.models import FirewallRule
 from .models import WhiteboardState, UserPreferences
 
 

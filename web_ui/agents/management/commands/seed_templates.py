@@ -1,7 +1,7 @@
 """Management command to seed firewall templates."""
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from agents.models import FirewallTemplate
+from modules.firewalld.models import FirewallTemplate
 
 User = get_user_model()
 

@@ -9,7 +9,8 @@ from datetime import datetime, timedelta
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from django.db import connection
-from agents.models import Agent, FirewallZone, FirewallRule
+from agents.models import Agent
+from modules.firewalld.models import FirewallZone, FirewallRule
 from agents.connection_managers import get_connection_manager
 
 # Set up logging

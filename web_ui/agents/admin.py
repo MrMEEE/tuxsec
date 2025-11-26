@@ -1,5 +1,8 @@
 from django.contrib import admin
-from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCommand, AuditLog
+from .models import Agent, AgentConnection, AgentCommand, AuditLog
+
+# NOTE: Firewall models (FirewallZone, FirewallRule, etc.) have been moved to modules.firewalld
+# See modules/firewalld/admin.py for their admin configuration
 
 
 @admin.register(Agent)
@@ -8,20 +11,6 @@ class AgentAdmin(admin.ModelAdmin):
     list_filter = ['connection_type', 'status', 'created_at']
     search_fields = ['hostname', 'ip_address']
     readonly_fields = ['id', 'created_at', 'updated_at']
-
-
-@admin.register(FirewallZone)
-class FirewallZoneAdmin(admin.ModelAdmin):
-    list_display = ['name', 'agent', 'target', 'masquerade', 'created_at']
-    list_filter = ['target', 'masquerade', 'created_at']
-    search_fields = ['name', 'agent__hostname']
-
-
-@admin.register(FirewallRule)
-class FirewallRuleAdmin(admin.ModelAdmin):
-    list_display = ['rule_type', 'agent', 'zone', 'service', 'port', 'protocol', 'enabled', 'created_at']
-    list_filter = ['rule_type', 'protocol', 'enabled', 'permanent', 'created_at']
-    search_fields = ['agent__hostname', 'zone__name', 'service', 'port']
 
 
 @admin.register(AgentConnection)

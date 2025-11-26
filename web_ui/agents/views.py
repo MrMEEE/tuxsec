@@ -14,7 +14,8 @@ import httpx
 import asyncio
 from datetime import datetime
 
-from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCommand, DirectRule
+from .models import Agent, AgentConnection, AgentCommand
+from modules.firewalld.models import FirewallZone, FirewallRule, DirectRule
 from .forms import AgentForm
 from .serializers import (
     AgentSerializer, FirewallZoneSerializer, FirewallRuleSerializer,
@@ -2231,7 +2232,8 @@ def agent_service_detail(request, agent_id, service_name):
 @require_http_methods(['POST'])
 def agent_service_create(request, agent_id):
     """Create a new custom service."""
-    from .models import AuditLog, CustomService
+    from .models import AuditLog
+    from modules.firewalld.models import CustomService
     
     agent = get_object_or_404(Agent, id=agent_id)
     
@@ -2321,7 +2323,8 @@ def agent_service_create(request, agent_id):
 @require_http_methods(['POST'])
 def agent_service_delete(request, agent_id, service_name):
     """Delete a custom service."""
-    from .models import AuditLog, CustomService
+    from .models import AuditLog
+    from modules.firewalld.models import CustomService
     
     agent = get_object_or_404(Agent, id=agent_id)
     
@@ -2579,7 +2582,8 @@ def agent_ipset_detail(request, agent_id, ipset_name):
 @require_http_methods(['POST'])
 def agent_ipset_create(request, agent_id):
     """Create a new IPSet."""
-    from .models import AuditLog, IPSet
+    from .models import AuditLog
+    from modules.firewalld.models import IPSet
     
     agent = get_object_or_404(Agent, id=agent_id)
     
@@ -2674,7 +2678,8 @@ def agent_ipset_create(request, agent_id):
 @require_http_methods(['POST'])
 def agent_ipset_delete(request, agent_id, ipset_name):
     """Delete an IPSet."""
-    from .models import AuditLog, IPSet
+    from .models import AuditLog
+    from modules.firewalld.models import IPSet
     
     agent = get_object_or_404(Agent, id=agent_id)
     
@@ -3105,7 +3110,8 @@ def agent_policy_detail(request, agent_id, policy_name):
 @require_http_methods(['POST'])
 def agent_policy_create(request, agent_id):
     """Create a new firewall policy."""
-    from .models import AuditLog, FirewallPolicy
+    from .models import AuditLog
+    from modules.firewalld.models import FirewallPolicy
     
     agent = get_object_or_404(Agent, id=agent_id)
     
@@ -3236,7 +3242,8 @@ def agent_policy_create(request, agent_id):
 @require_http_methods(['POST'])
 def agent_policy_delete(request, agent_id, policy_name):
     """Delete a firewall policy."""
-    from .models import AuditLog, FirewallPolicy
+    from .models import AuditLog
+    from modules.firewalld.models import FirewallPolicy
     
     agent = get_object_or_404(Agent, id=agent_id)
     
@@ -3292,7 +3299,7 @@ def agent_policy_delete(request, agent_id, policy_name):
 @require_http_methods(['GET'])
 def template_list(request):
     """List all firewall templates."""
-    from .models import FirewallTemplate
+    from modules.firewalld.models import FirewallTemplate
     
     # Filter by category if provided
     category = request.GET.get('category')
@@ -3345,7 +3352,7 @@ def template_list(request):
 @require_http_methods(['GET'])
 def template_detail(request, template_id):
     """Get detailed information about a template."""
-    from .models import FirewallTemplate
+    from modules.firewalld.models import FirewallTemplate
     
     try:
         template = FirewallTemplate.objects.get(id=template_id, is_active=True)
@@ -3384,7 +3391,8 @@ def template_detail(request, template_id):
 @require_http_methods(['POST'])
 def template_create(request):
     """Create a new firewall template."""
-    from .models import FirewallTemplate, AuditLog
+    from .models import AuditLog
+    from modules.firewalld.models import FirewallTemplate
     
     try:
         data = json.loads(request.body)
@@ -3463,7 +3471,8 @@ def template_create(request):
 @require_http_methods(['POST'])
 def template_update(request, template_id):
     """Update an existing firewall template."""
-    from .models import FirewallTemplate, AuditLog
+    from .models import AuditLog
+    from modules.firewalld.models import FirewallTemplate
     
     try:
         template = FirewallTemplate.objects.get(id=template_id)
@@ -3552,7 +3561,8 @@ def template_update(request, template_id):
 @require_http_methods(['POST'])
 def template_delete(request, template_id):
     """Delete a firewall template."""
-    from .models import FirewallTemplate, AuditLog
+    from .models import AuditLog
+    from modules.firewalld.models import FirewallTemplate
     
     try:
         template = FirewallTemplate.objects.get(id=template_id)
@@ -3601,7 +3611,8 @@ def template_delete(request, template_id):
 @require_http_methods(['POST'])
 def template_duplicate(request, template_id):
     """Duplicate an existing firewall template."""
-    from .models import FirewallTemplate, AuditLog
+    from .models import AuditLog
+    from modules.firewalld.models import FirewallTemplate
     
     try:
         original = FirewallTemplate.objects.get(id=template_id, is_active=True)
@@ -3672,7 +3683,7 @@ def templates_page(request):
 @require_http_methods(['POST'])
 def template_preview(request, agent_id, template_id):
     """Preview changes that will be made when applying a template to an agent."""
-    from .models import FirewallTemplate
+    from modules.firewalld.models import FirewallTemplate
     
     agent = get_object_or_404(Agent, id=agent_id)
     
@@ -3755,7 +3766,8 @@ def template_preview(request, agent_id, template_id):
 @require_http_methods(['POST'])
 def template_apply(request, agent_id, template_id):
     """Apply a firewall template to an agent."""
-    from .models import FirewallTemplate, AuditLog, CustomService, IPSet, FirewallPolicy
+    from .models import AuditLog
+    from modules.firewalld.models import FirewallTemplate, CustomService, IPSet, FirewallPolicy
     
     agent = get_object_or_404(Agent, id=agent_id)
     

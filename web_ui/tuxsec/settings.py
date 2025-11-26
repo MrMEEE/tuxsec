@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'dashboard',
     'users',
     'modules',
+    'modules.firewalld',
     'settings',
 ]
 

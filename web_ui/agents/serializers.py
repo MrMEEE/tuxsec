@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Agent, FirewallZone, FirewallRule, AgentConnection, AgentCommand
+from .models import Agent, AgentConnection, AgentCommand
+from modules.firewalld.models import FirewallZone, FirewallRule
 
 
 class AgentSerializer(serializers.ModelSerializer):
